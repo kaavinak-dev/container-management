@@ -1,0 +1,27 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "GrpcApplyServer";
+
+package GrpcApplyServer;
+
+
+
+message CreateProcessRequest{
+	string processId=1;
+	string jobHandle=2;
+}
+
+message CreateProcessResponse{
+	string processId=1;
+}
+
+message GrpcProcess{
+	string processId=1;
+	string jobHandle=2;
+}
+
+
+
+
+
+

@@ -1,0 +1,16 @@
+﻿
+syntax = "proto3";
+option csharp_namespace = "GrpcApplyServer";
+
+
+package GrpcApplyServer;
+
+import "Grpc/Protos/process_service.proto";
+import "Grpc/Protos/job_service.proto";
+
+// The greeting service definition.
+service GrpcApplyService  {
+  // Sends a greeting
+  rpc CreateJob (CreateJobRequest) returns (CreateJobResponse);
+  rpc CreateProcessInJob (CreateProcessRequest) returns (CreateProcessResponse);		   
+}

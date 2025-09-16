@@ -1,0 +1,18 @@
+﻿
+syntax = "proto3";
+option csharp_namespace = "GrpcApplyServer";
+
+package GrpcApplyServer;
+
+import "Grpc/Protos/process_service.proto";
+
+
+message CreateJobRequest {
+	string jobName=1;
+}
+
+message CreateJobResponse{
+	string jobHandle=1;
+}
+
+

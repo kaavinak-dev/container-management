@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
+    <PackageReference Include="FluentResults" Version="4.0.0" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Management" Version="9.0.8" />
+  </ItemGroup>
+
+ <ItemGroup>
+  <Protobuf Include="Grpc\Protos\job_service.proto" GrpcServices="None" />
+	<Protobuf Include="Grpc\Protos\process_service.proto" GrpcServices="None" />
+  <Protobuf Include="Grpc\Protos\apply_service.proto" />
+</ItemGroup>	
+
+	<ItemGroup>
+    <ProjectReference Include="..\Domain\Domain.csproj" />
+  </ItemGroup>	
+
+	<ItemGroup>
+	  <Folder Include="Grpc\Protos\NewFolder\" />
+	</ItemGroup>
+
+
+</Project>
