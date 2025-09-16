@@ -9,6 +9,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "os-process-manager-infrastr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "os-process-manager-service", "os-process-manager-service\os-process-manager-service.csproj", "{717A3573-1520-4602-9B68-FA0FF485F9E4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Infrastructure", "Infrastructure", "{6A001E32-3110-4FFB-B17D-F01A137C120F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeploymentManager", "DeploymentManager\DeploymentManager.csproj", "{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OperatingSystemLake", "OperatingSystemLake\OperatingSystemLake.csproj", "{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,9 +33,21 @@ Global
 		{717A3573-1520-4602-9B68-FA0FF485F9E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{717A3573-1520-4602-9B68-FA0FF485F9E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{717A3573-1520-4602-9B68-FA0FF485F9E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD} = {6A001E32-3110-4FFB-B17D-F01A137C120F}
+		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF} = {6A001E32-3110-4FFB-B17D-F01A137C120F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3CA06CA3-4AFC-4C94-952C-F22ABA346584}

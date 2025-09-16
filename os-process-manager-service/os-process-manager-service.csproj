@@ -3,8 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
 	  <OutputType>Exe</OutputType>
-	   <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>true</SelfContained>
+	   <SelfContained>true</SelfContained>
 	     <PublishSingleFile>true</PublishSingleFile>
 	   <PublishTrimmed>false</PublishTrimmed>
   <DebugType>none</DebugType>

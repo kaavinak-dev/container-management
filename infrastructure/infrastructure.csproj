@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="DeploymentComponents\Docker\DockerFile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="DeploymentComponents\Docker\Dockerfile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DeploymentComponents\os-process-manager-binaries\" />
+  </ItemGroup>
+
+</Project>

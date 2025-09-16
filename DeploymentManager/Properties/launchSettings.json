@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DeploymentManager": {
+      "commandName": "Project",
+      "commandLineArgs": "Windows"
+    }
+    }
+}
