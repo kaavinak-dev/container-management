@@ -13,7 +13,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Infrastructure", "Infrastru
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeploymentManager", "DeploymentManager\DeploymentManager.csproj", "{4B661BEB-9E57-4E65-AD4C-54A724B73DAD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OperatingSystemLake", "OperatingSystemLake\OperatingSystemLake.csproj", "{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OperatingSystemLake", "OperatingSystemLake\OperatingSystemLake.csproj", "{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OSOrchestrator", "OSOrchestrator\OSOrchestrator.csproj", "{1B924B10-EFC0-4D7B-80AC-B52D68B4A134}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,13 +43,17 @@ Global
 		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B924B10-EFC0-4D7B-80AC-B52D68B4A134}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B924B10-EFC0-4D7B-80AC-B52D68B4A134}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B924B10-EFC0-4D7B-80AC-B52D68B4A134}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B924B10-EFC0-4D7B-80AC-B52D68B4A134}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{4B661BEB-9E57-4E65-AD4C-54A724B73DAD} = {6A001E32-3110-4FFB-B17D-F01A137C120F}
 		{5C45C8D5-7C88-4F4A-851E-0A7DB3B566BF} = {6A001E32-3110-4FFB-B17D-F01A137C120F}
+		{1B924B10-EFC0-4D7B-80AC-B52D68B4A134} = {6A001E32-3110-4FFB-B17D-F01A137C120F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3CA06CA3-4AFC-4C94-952C-F22ABA346584}

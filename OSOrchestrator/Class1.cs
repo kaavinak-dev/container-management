@@ -1,4 +1,4 @@
-﻿namespace infrastructure
+﻿namespace OSOrchestrator
 {
     public class Class1
     {
