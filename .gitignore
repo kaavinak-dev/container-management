@@ -70,6 +70,8 @@ ScaffoldingReadMe.txt
 *.cache
 *.pidb
 *.svclog
+*.tar
+*.exe
 
 ## Resharper
 _ReSharper*/

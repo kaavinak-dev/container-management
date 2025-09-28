@@ -2,7 +2,7 @@
   "profiles": {
     "DeploymentManager": {
       "commandName": "Project",
-      "commandLineArgs": "Windows"
+      "commandLineArgs": "DeployArtifact Windows"
     }
-    }
+  }
 }

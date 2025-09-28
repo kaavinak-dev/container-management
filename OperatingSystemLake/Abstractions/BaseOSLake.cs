@@ -9,29 +9,13 @@ namespace OperatingSystemLake.Abstractions
 {
     public abstract class BaseOSLake
     {
-        protected Dictionary<string, object> LakeProperties = new();
-        
+        public string OSLakeName;
+        public string OSLakeIp;
 
-        public abstract Process GetOSLakeAttachedProcess(ProcessStartInfo processConfig,IProcessDataLakeConnector processDataLakeConnector);
-        public abstract object GetOSLakeLockObject();
-
-        public abstract bool GetLakeInstanceStatus();
-
-        public abstract void LakeInstanceInstantiated();
-
-        public void InstantiateLakeInstance()
+        public BaseOSLake(string OSLakeName,string OSLakeIp)
         {
-            if (GetLakeInstanceStatus() == false)
-            {
-                lock (GetOSLakeLockObject())
-                {
-                    if (GetLakeInstanceStatus() == false)
-                    {
-                        LakeInstanceInstantiated();
-                    }
-                }
-            }
+            this.OSLakeName = OSLakeName;
+            this.OSLakeIp = OSLakeIp;
         }
-        
     }
 }

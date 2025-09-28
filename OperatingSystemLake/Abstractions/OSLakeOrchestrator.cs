@@ -6,8 +6,14 @@ using System.Threading.Tasks;
 
 namespace OperatingSystemLake.Abstractions
 {
+
+    public enum OSLakeTypes
+    {
+        Windows
+    }
+
     public interface OSLakeOrchestrator
     {
-        public Dictionary<string, object> GetOSLakesInfo(string osLakeType);
+        public BaseOSLake GetRunningOSLakeForOrchestratorType(OSLakeTypes lakeType);
     }
 }

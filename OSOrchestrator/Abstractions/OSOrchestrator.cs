@@ -5,12 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DeploymentManager.DeploymentComponents.Abstractions
+namespace OSOrchestrator.Abstractions
 {
-    public abstract class OSOrchestrator
+    public abstract class OSOrchestrator<Client>
     {
-        protected Process OrchestratorProcess; 
-        public abstract  Task  SetUpOrchestrationEnvironment();
+        protected Client OSOrchestratorClient;
+        public abstract  Client  GetOSOrchestratorClient();
         public abstract Task BuildOSArtifact();
     }
 }

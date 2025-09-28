@@ -7,5 +7,10 @@
     <Nullable>enable</Nullable>
     </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\OperatingSystemLake\OperatingSystemLake.csproj" />
+    <ProjectReference Include="..\OSOrchestrator\OSOrchestrator.csproj" />
+  </ItemGroup>
+
  
 </Project>

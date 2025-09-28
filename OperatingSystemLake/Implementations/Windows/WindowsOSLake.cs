@@ -10,32 +10,10 @@ namespace OperatingSystemLake.Implementations.Windows
 {
     public class WindowsOSLake : BaseOSLake
     {
-        private static readonly object lockObject;
-        protected static bool osLakeInstance;
-
-        public WindowsOSLake() { 
+        public WindowsOSLake(string OSLakeName,string OSLakeIp):base(OSLakeName,OSLakeIp) { 
         
         }
 
-        public override bool GetLakeInstanceStatus()
-        {
-            return osLakeInstance;            
-        }
-
-        public override Process GetOSLakeAttachedProcess(ProcessStartInfo processConfig,IProcessDataLakeConnector processDataLakeConnector)
-        {
-            var process = Process.Start(processConfig);
-
-        }
-
-        public override object GetOSLakeLockObject()
-        {
-            return lockObject;            
-        }
-
-        public override void LakeInstanceInstantiated()
-        {
-                        
-        }
+       
     }
 }
