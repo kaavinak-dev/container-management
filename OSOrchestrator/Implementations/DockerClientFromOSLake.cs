@@ -9,25 +9,21 @@ using System.Threading.Tasks;
 
 namespace OSOrchestrator.Implementations
 {
-    public class DockerClientFromOSLake : OSOrchestratorFromOSLakeStrategy<DockerClient>
+    public class DockerClientFromOSLake : OSOrchestratorFromOSLakeStrategy
     {
         private static string osLakeIp;
         public DockerClientFromOSLake(string _osLakeIp)
         {
             osLakeIp= _osLakeIp;
         }
-        public Abstractions.OSOrchestrator<DockerClient> GetOSOrchestrator()
+        public Abstractions.OSOrchestrator GetOSOrchestrator()
         {
             string uri = $"tcp://{osLakeIp}:2375";
             var uriObj= new Uri(uri);
-            DockerClient client;
-            client = new DockerClientConfiguration(uriObj).CreateClient();
-            var containers=client.Containers.ListContainersAsync(new Docker.DotNet.Models.ContainersListParameters() { Limit = 10 }).GetAwaiter().GetResult();
-            foreach (var container in containers)
-            {
-                Console.WriteLine(container.ID + " - " + container.Image);
-            }
-            return new DockerOSOrchestrator(client);
+           
+            var orchestrator=new DockerOSOrchestrator(uri);
+            orchestrator.CreateAndSetOSOrchestratorClient();
+            return orchestrator;
         }
     }
 }

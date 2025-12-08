@@ -12,4 +12,4 @@ EXPOSE 5000
 EXPOSE 5001
 
 # Set the entry point to your self-contained app
-ENTRYPOINT ["./windows/os-process-manager-service.exe"]
+ENTRYPOINT ["cmd","/c","cd ./windows && os-process-manager-service.exe"]

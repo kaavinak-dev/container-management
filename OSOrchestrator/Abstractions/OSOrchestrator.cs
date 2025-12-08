@@ -7,10 +7,17 @@ using System.Threading.Tasks;
 
 namespace OSOrchestrator.Abstractions
 {
-    public abstract class OSOrchestrator<Client>
+    public abstract class OSOrchestrator
     {
-        protected Client OSOrchestratorClient;
-        public abstract  Client  GetOSOrchestratorClient();
-        public abstract Task BuildOSArtifact();
+        public OSOrchestrator()
+        {
+                   
+        }
+
+        public abstract void CreateAndSetOSOrchestratorClient();
+        public abstract T GetOSOrchestratorClient<T>();
+
+        public abstract void CreateOS();
+
     }
 }

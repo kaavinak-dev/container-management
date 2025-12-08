@@ -1,0 +1,34 @@
+﻿version: '3'
+services:
+  minio-1:
+    image: minio/minio
+    command: server /data
+    ports:
+      - "9002:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+
+  minio-2:
+    image: minio/minio
+    command: server /data
+    ports:
+      - "9003:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+
+  clamav:
+    image: clamav/clamav:latest
+    container_name: clamav-server
+    ports:
+      - "3310:3310"
+    environment:
+      - CLAMAV_NO_FRESHCLAM=false
+      - FRESHCLAM_CHECKS=24
+      - CLAMD_CONF_MaxFileSize=100M
+      - CLAMD_CONF_MaxScanSize=500M
+      - CLAMD_CONF_MaxThreads=10
+    restart: unless-stopped

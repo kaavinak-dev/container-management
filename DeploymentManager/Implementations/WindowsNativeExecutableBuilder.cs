@@ -44,6 +44,7 @@ namespace DeploymentManager.Implementations
             processCommunicator.ExecuteCommand("dotnet.exe publish \"D:\\advanced-programming\\dotnet\\container-management\\os-process-manager-service\\os-process-manager-service.csproj\" -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true  -o \"D:\\advanced-programming\\dotnet\\container-management\\DeploymentManager\\DeploymentComponents\\os-process-manager-binaries\\windows\"",handleBuildLogs, handleErrorLogs);
             processCommunicator.EndTransaction();
             processCommunicator.EndProcess();
+
                
         }
 

@@ -8,8 +8,8 @@ using OSOrchestrator;
 
 namespace  OSOrchestrator.Abstractions
 {
-    public interface OSOrchestratorFromOSLakeStrategy<OSOrchestratorClient>
+    public interface OSOrchestratorFromOSLakeStrategy
     {
-        public   OSOrchestrator<OSOrchestratorClient> GetOSOrchestrator();
+        public   OSOrchestrator GetOSOrchestrator();
     }
 }

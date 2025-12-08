@@ -83,6 +83,7 @@ namespace OperatingSystemLake.Implementations.Windows
                 }
             });
             virtualBoxProcess.EndTransaction();
+            virtualBoxProcess.EndProcess();
             return ipAddress;
         }
 
