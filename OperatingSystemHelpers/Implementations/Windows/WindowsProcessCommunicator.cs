@@ -9,16 +9,17 @@ using System.Diagnostics;
 
 namespace OperatingSystemHelpers.Implementations.Windows
 {
-    public  class WindowsProcessCommunicator:ProcessCommunicator
+    public class WindowsProcessCommunicator : ProcessCommunicator
     {
         private StreamWriter commandWriter;
         private DataReceivedEventHandler commandOutputHandler;
         private DataReceivedEventHandler commandErrorHandler;
-        public WindowsProcessCommunicator():base() { 
-           
+        public WindowsProcessCommunicator() : base()
+        {
+
         }
 
-        public override void StartProcess()
+        public override void StartProcess(string workingDirPath = null)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -26,10 +27,15 @@ namespace OperatingSystemHelpers.Implementations.Windows
                 UseShellExecute = false,
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
-                RedirectStandardInput=true,
+                RedirectStandardInput = true,
                 CreateNoWindow = true,
+
             };
-            processInstance=Process.Start(startInfo);
+            if (!string.IsNullOrEmpty(workingDirPath))
+            {
+                startInfo.WorkingDirectory = workingDirPath;
+            }
+            processInstance = Process.Start(startInfo);
             processInstance.BeginErrorReadLine();
             processInstance.BeginOutputReadLine();
             commandWriter = processInstance.StandardInput;
@@ -37,7 +43,7 @@ namespace OperatingSystemHelpers.Implementations.Windows
             {
                 if (commandOutputHandler != null)
                 {
-                    if (eventMsg.Data==null || eventMsg.Data.Contains("_END_"))
+                    if (eventMsg.Data == null || eventMsg.Data.Contains("_END_"))
                     {
                         processInstance.OutputDataReceived -= commandOutputHandler;
                         commandProcessing = false;
@@ -48,10 +54,10 @@ namespace OperatingSystemHelpers.Implementations.Windows
             {
                 if (commandOutputHandler != null)
                 {
-                    if (eventMsg.Data == null ||   eventMsg.Data.Contains("_END_"))
+                    if (eventMsg.Data == null || eventMsg.Data.Contains("_END_"))
                     {
                         processInstance.ErrorDataReceived -= commandOutputHandler;
-                        commandProcessing=false;
+                        commandProcessing = false;
                     }
                 }
             };
@@ -71,7 +77,7 @@ namespace OperatingSystemHelpers.Implementations.Windows
                 }
 
             }
-                  
+
         }
 
         public override void EndTransaction()
@@ -88,14 +94,14 @@ namespace OperatingSystemHelpers.Implementations.Windows
             }
         }
 
-        public override void ExecuteCommand(string command,DataReceivedEventHandler outputCb, DataReceivedEventHandler errorCb)
+        public override void ExecuteCommand(string command, DataReceivedEventHandler outputCb, DataReceivedEventHandler errorCb)
         {
             int counter = 0;
             while (commandProcessing)
             {
                 Thread.Sleep(1000);
                 counter += 1;
-                if(counter == 300)
+                if (counter == 300)
                 {
                     throw new Exception("command not executed");
                 }
@@ -107,11 +113,11 @@ namespace OperatingSystemHelpers.Implementations.Windows
             commandErrorHandler = errorCb;
             processInstance.OutputDataReceived += outputCb;
             processInstance.ErrorDataReceived += errorCb;
-                         
-           
+
+
         }
 
-        
+
 
         public override void EndProcess()
         {

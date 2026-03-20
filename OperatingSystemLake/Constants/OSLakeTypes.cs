@@ -8,6 +8,8 @@ namespace OperatingSystemLake.Constants
 {
     public enum OSLakeTechTypes
     {
-        VirtualBox
+        VirtualBox,
+        DockerMachine,
+        Aws
     }
 }

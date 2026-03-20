@@ -2,12 +2,17 @@ using ContainerManagerBackend.Helpers;
 using ContainerManagerBackend.Services;
 using OperatingSystemHelpers.Implementations.Windows;
 using OperatingSystemLake.Abstractions;
+using OperatingSystemLake.Implementations.Linux;
 using OperatingSystemLake.Implementations.Windows;
 using OSOrchestrator.Abstractions;
 using Engines.FileStorageEngines;
+using Engines.DataBaseStorageEngines;
+using Engines.DataBaseStorageEngines.Abstractions;
+using Engines.DataBaseStorageEngines.Implementations;
 using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Engines.FileStorageEngines.Implementations;
+using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -19,9 +24,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //builder.Services.AddSingleton<OSLakeOrchestrator>(singletonPreConfigureServicesBuilder.OSLakeOrchestrator);
 //builder.Services.AddSingleton<OSOrchestrator.Abstractions.OSOrchestrator>(singletonPreConfigureServicesBuilder.OSOrchestrator);
+builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(new WindowsProcessCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(new WindowsProcessCommunicator()));
 builder.Services.AddScoped<RequestBodyParser>();
 //builder.Services.AddSingleton<FileStorageManager>();
-builder.Services.AddSingleton<FileStorageManager>(serviceProvider =>
+builder.Services.AddSingleton<ProjectStorageManager>(serviceProvider =>
 {
     //var config = serviceProvider.GetRequiredService<IConfiguration>();
     List<Dictionary<string, string>> fileServers = new List<Dictionary<string, string>>()
@@ -39,10 +46,10 @@ builder.Services.AddSingleton<FileStorageManager>(serviceProvider =>
             {"SecretKey","minioadmin"}
         }
     };
-    return new FileStorageManager(fileServers);
+    return new ProjectStorageManager(fileServers);
 
 });
-builder.Services.AddHostedService<FileStorageEngineBackgroundService>();
+builder.Services.AddHostedService<ProjectStorageEngineBackgroundService>();
 builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
@@ -52,6 +59,10 @@ builder.Services.AddHangfire(configuration => configuration
         Prefix = "hangfire:",
         ExpiryCheckInterval = TimeSpan.FromHours(1)
     }));
+builder.Services.AddDbContext<ProjectDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
+        ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
+builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
 //builder.Services.AddScoped<ExecutableProcessingJobEnque>();
 
 var app = builder.Build();

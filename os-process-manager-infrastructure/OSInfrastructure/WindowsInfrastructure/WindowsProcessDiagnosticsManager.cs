@@ -13,7 +13,7 @@ using Domain.Ports.OSPorts;
 namespace OSProcessManagerInfastructure.OSInfrastructure.WindowsInfrastructure
 {
 
-    public class WindowsJobManagement : OSProcessManagementObject
+    public class WindowsProcessManagement : OSProcessManagementObject
     {
         
         public Dictionary<string,Dictionary<string, string>> GetManagementInfo(Dictionary<string,object> managementInfo)

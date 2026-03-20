@@ -11,7 +11,6 @@ namespace Domain.Entities.Implementations.Windows
     public class WindowsProcess : OSProcess
     {
 
-        public string? JobHandle { get; set; }
         public string? ProcessHandle { get; set; }
 
         public WindowsProcess():base() { }

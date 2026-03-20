@@ -14,7 +14,7 @@ namespace OperatingSystemHelpers.Abstractions
         public ProcessCommunicator()
         {
         }
-        public abstract void StartProcess();
+        public abstract void StartProcess(string workingDirPath = null);
 
         public abstract void ExecuteCommand(string command, DataReceivedEventHandler outputCb, DataReceivedEventHandler errorCb);
 

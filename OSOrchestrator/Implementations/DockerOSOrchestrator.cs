@@ -25,11 +25,12 @@ namespace OSOrchestrator.Implementations
             this.dockerDaemonUri = _dockerDaemonUri;
         }
 
-        public override void CreateOS()
+        public override void CreateOS(string imageName = "osprocessmanager")
         {
-            var createContainerConfig = new CreateContainerParameters() { 
-            Image="osprocessmanager",
-            Name="new_auto_image"
+            var createContainerConfig = new CreateContainerParameters()
+            {
+                Image = imageName,
+                Name = $"project-{Guid.NewGuid():N}"
             };
             var containerCreationResponse= _client.Containers.CreateContainerAsync(createContainerConfig).GetAwaiter().GetResult();
             var containerId = containerCreationResponse.ID;

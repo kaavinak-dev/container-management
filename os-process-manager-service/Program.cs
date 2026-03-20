@@ -1,8 +1,11 @@
 using Domain.Entities.Abstractions;
 using Domain.Entities.Implementations.Windows;
+using Domain.Entities.Implementations.Linux;
 using Domain.Ports.OSPorts;
 using OSProcessManagerInfastructure.Grpc;
 using OSProcessManagerInfastructure.OSInfrastructure.WindowsInfrastructure;
+using OSProcessManagerInfastructure.OSInfrastructure.LinuxInfrastructure;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,9 +16,17 @@ builder.Services.AddGrpc();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddWindowsDomainServices();
-builder.Services.AddWindowsInfrastructureServices();
-builder.Services.AddGrpcServices();
+
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+{
+    builder.Services.AddLinuxDomainServices();
+    builder.Services.AddLinuxInfrastructureServices();
+}
+else
+{
+    builder.Services.AddWindowsDomainServices();
+    builder.Services.AddWindowsInfrastructureServices();
+}
 
 builder.WebHost.ConfigureKestrel((options) =>
 {
@@ -53,7 +64,7 @@ app.UseAuthorization();
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
-    endpoints.MapGrpcService<ApplyService>();
+    endpoints.MapGrpcService<ProcessServiceImpl>();
 });
 
 app.Run();

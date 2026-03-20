@@ -13,7 +13,6 @@ namespace Engines.FileStorageEngines.Abstractions
         QUARANTINE,
         VIRUS
 
-
     }
 
     public abstract class FileVirusScanner<T, ScanResult> where T : class

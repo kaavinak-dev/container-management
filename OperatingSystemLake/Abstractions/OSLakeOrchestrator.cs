@@ -9,11 +9,7 @@ namespace OperatingSystemLake.Abstractions
 
     public enum OSLakeTypes
     {
-        Windows
-    }
-
-    public interface OSLakeOrchestrator
-    {
-        public BaseOSLake GetRunningOSLakeForOrchestratorType(OSLakeTypes lakeType);
+        Windows,
+        Linux
     }
 }

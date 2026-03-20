@@ -11,10 +11,8 @@ namespace OSProcessManagerInfastructure.OSInfrastructure.WindowsInfrastructure
     {
         public static void AddWindowsInfrastructureServices(this IServiceCollection services)
         {
-            services.AddTransient<OSProcessManagementObject, WindowsJobManagement>();
-            services.AddTransient<OSJobManager, WindowsJobManager>();
+            services.AddTransient<OSProcessManagementObject, WindowsProcessManagement>();
             services.AddTransient<OSProcessDiagnosticManager, WindowsProcessDiagnosticsManager>();
-
         }
     }
 }

@@ -17,32 +17,32 @@ using Newtonsoft.Json;
 namespace Engines.FileStorageEngines
 {
 
-    public interface IFileStorageManager
+    public interface IProjectStorageManager
     {
 
-        public List<FileStorageEngine> GetStorageEngines();
+        public List<ProjectStorageEngine> GetStorageEngines();
 
 
-        public FileStorageEngine GetFileStorageEngine();
+        public ProjectStorageEngine GetFileStorageEngine();
 
 
-        public void SetFileStorageEngine(FileStorageEngine electedStorageEngine);
+        public void SetFileStorageEngine(ProjectStorageEngine electedStorageEngine);
 
 
-        public FileStorageEngine QueryStorageEngine(string url, int port);
+        public ProjectStorageEngine QueryStorageEngine(string url, int port);
 
 
     }
 
 
-    public class FileStorageManager : IFileStorageManager
+    public class ProjectStorageManager : IProjectStorageManager
     {
-        private static List<FileStorageEngine> storageEngines;
-        private static FileStorageEngine StorageEngine;
+        private static List<ProjectStorageEngine> storageEngines;
+        private static ProjectStorageEngine StorageEngine;
         private static bool isDevEnv = true;
         private static bool server_clients_generated = false;
 
-        public FileStorageManager(List<Dictionary<string, string>> config)
+        public ProjectStorageManager(List<Dictionary<string, string>> config)
         {
 
             if (storageEngines == null || storageEngines.Count <= 0)
@@ -62,9 +62,9 @@ namespace Engines.FileStorageEngines
         }
 
 
-        public List<FileStorageEngine> FetchCurrentRunningStorageEnginesDevEnv(List<Dictionary<string, string>> config)
+        public List<ProjectStorageEngine> FetchCurrentRunningStorageEnginesDevEnv(List<Dictionary<string, string>> config)
         {
-            var fetchedEngines = new List<FileStorageEngine>();
+            var fetchedEngines = new List<ProjectStorageEngine>();
 
             // Iterate through each server dictionary in the list
             foreach (var server in config)
@@ -72,14 +72,14 @@ namespace Engines.FileStorageEngines
                 string serverUrl = server["Url"];
                 int serverPort = int.Parse(server["Port"]);
 
-                fetchedEngines.Add(new MinioFileStorageEngine(serverUrl, serverPort));
+                fetchedEngines.Add(new MinioProjectStorageEngine(serverUrl, serverPort));
             }
 
             return fetchedEngines;
         }
 
 
-        public List<FileStorageEngine> FetchCurrentRunningStorageEngines(List<Dictionary<string, string>> config = null)
+        public List<ProjectStorageEngine> FetchCurrentRunningStorageEngines(List<Dictionary<string, string>> config = null)
         {
 
             if (isDevEnv)
@@ -159,25 +159,25 @@ namespace Engines.FileStorageEngines
 
         }
 
-        public List<FileStorageEngine> GetStorageEngines()
+        public List<ProjectStorageEngine> GetStorageEngines()
         {
 
             return storageEngines;
         }
 
-        public FileStorageEngine GetFileStorageEngine()
+        public ProjectStorageEngine GetFileStorageEngine()
         {
             return StorageEngine;
         }
 
-        public void SetFileStorageEngine(FileStorageEngine electedStorageEngine)
+        public void SetFileStorageEngine(ProjectStorageEngine electedStorageEngine)
         {
             StorageEngine = electedStorageEngine;
         }
 
-        public FileStorageEngine QueryStorageEngine(string url, int port)
+        public ProjectStorageEngine QueryStorageEngine(string url, int port)
         {
-            FileStorageEngine filteredEngine = storageEngines.Where(engine =>
+            ProjectStorageEngine filteredEngine = storageEngines.Where(engine =>
             {
 
                 if (engine._enginePort == port && engine._engineUrl == url)
@@ -194,11 +194,11 @@ namespace Engines.FileStorageEngines
     }
 
 
-    public class FileStorageEngineBackgroundService : BackgroundService
+    public class ProjectStorageEngineBackgroundService : BackgroundService
     {
 
-        FileStorageManager engineManagerInstance;
-        public FileStorageEngineBackgroundService(FileStorageManager engineManager)
+        ProjectStorageManager engineManagerInstance;
+        public ProjectStorageEngineBackgroundService(ProjectStorageManager engineManager)
         {
 
             engineManagerInstance = engineManager;
@@ -206,7 +206,7 @@ namespace Engines.FileStorageEngines
 
         }
 
-        protected FileStorageEngine ElectBestEngine(List<Dictionary<string, object>> engineHealthObjects)
+        protected ProjectStorageEngine ElectBestEngine(List<Dictionary<string, object>> engineHealthObjects)
         {
             var byFreeBytesUsable = engineHealthObjects
             .Where(e => e.ContainsKey("FreeBytesUsable") && e.ContainsKey("server"))
@@ -343,7 +343,7 @@ namespace Engines.FileStorageEngines
             }
         }
 
-        private async Task<Dictionary<string, object>> EngineInfoCheck(FileStorageEngine engine, CancellationToken cancelToken)
+        private async Task<Dictionary<string, object>> EngineInfoCheck(ProjectStorageEngine engine, CancellationToken cancelToken)
         {
             if (!cancelToken.IsCancellationRequested)
             {

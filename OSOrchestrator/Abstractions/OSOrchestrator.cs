@@ -17,7 +17,7 @@ namespace OSOrchestrator.Abstractions
         public abstract void CreateAndSetOSOrchestratorClient();
         public abstract T GetOSOrchestratorClient<T>();
 
-        public abstract void CreateOS();
+        public abstract void CreateOS(string imageName = "osprocessmanager");
 
     }
 }

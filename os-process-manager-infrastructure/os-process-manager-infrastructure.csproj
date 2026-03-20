@@ -15,9 +15,7 @@
   </ItemGroup>
 
  <ItemGroup>
-  <Protobuf Include="Grpc\Protos\job_service.proto" GrpcServices="None" />
-	<Protobuf Include="Grpc\Protos\process_service.proto" GrpcServices="None" />
-  <Protobuf Include="Grpc\Protos\apply_service.proto" />
+  <Protobuf Include="Grpc\Protos\process_service.proto" GrpcServices="Server" />
 </ItemGroup>	
 
 	<ItemGroup>

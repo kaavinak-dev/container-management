@@ -1,7 +1,7 @@
-﻿using OperatingSystemHelpers.Implementations.Windows;
+using OperatingSystemHelpers.Implementations.Windows;
 using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Constants;
-using OperatingSystemLake.Implementations.Windows;
+using OperatingSystemLake.Factory;
 using OSOrchestrator.Abstractions;
 using OSOrchestrator.Constants;
 using OSOrchestrator.Implementations;
@@ -14,34 +14,36 @@ namespace ContainerManagerBackend.Services
         private OSLakeTechTypes osLakeOrchestrationTechType;
         private OSOrchestratorTypes osOrchestrationType;
         public OSOrchestrator.Abstractions.OSOrchestrator OSOrchestrator { get; set; }
-        public OSLakeOrchestrator OSLakeOrchestrator { get; set; }
+        public OSLakeConnector OSLakeConnector { get; set; }
 
         public SingletonServicesPreConfigurationBuilder() { }
 
-       
-        public SingletonServicesPreConfigurationBuilder ConfigureOSLakeOrchestrator(OperatingSystemLake.Constants.OSLakeTechTypes oSOrchestratorTypes)
+        /// <summary>
+        /// Configures the OS Lake connector using the factory.
+        /// Pass OSLakeTechTypes.VirtualBox for Windows VMs (local),
+        /// OSLakeTechTypes.DockerMachine for Linux VMs (local dev),
+        /// or OSLakeTechTypes.Aws for cloud-hosted instances.
+        /// </summary>
+        public SingletonServicesPreConfigurationBuilder ConfigureOSLakeConnector(OSLakeTechTypes techType)
         {
-            if (OSLakeTechTypes.VirtualBox.ToString().ToLower() == oSOrchestratorTypes.ToString().ToLower())
-            {
-                this.osLakeOrchestrationTechType = oSOrchestratorTypes;
-                this.OSLakeOrchestrator= new VirtualBoxOSLakeOrchestrator(new WindowsProcessCommunicator());
-            }
+            this.osLakeOrchestrationTechType = techType;
+            this.OSLakeConnector = OSLakeConnectorFactory.Create(techType, new WindowsProcessCommunicator());
             return this;
         }
 
-        public SingletonServicesPreConfigurationBuilder ConfigureOSOrchestrator(OSOrchestratorTypes orchestrationTypes)
+        /// <summary>
+        /// Configures the OS orchestrator by discovering the appropriate OS lake
+        /// via the connector and connecting to its Docker daemon.
+        /// </summary>
+        public SingletonServicesPreConfigurationBuilder ConfigureOSOrchestrator(OSOrchestratorTypes orchestrationType, OSLakeTypes osType)
         {
-            if(OSOrchestratorTypes.Docker.ToString().ToLower() == orchestrationTypes.ToString().ToLower() && 
-                OSLakeTechTypes.VirtualBox.ToString().ToLower() == this.osLakeOrchestrationTechType.ToString().ToLower()
-                )
+            if (OSOrchestratorTypes.Docker.ToString().ToLower() == orchestrationType.ToString().ToLower())
             {
-                this.osOrchestrationType= orchestrationTypes;
-                var ip = this.OSLakeOrchestrator.GetRunningOSLakeForOrchestratorType(OSLakeTypes.Windows).OSLakeIp;
-                this.OSOrchestrator = new DockerClientFromOSLake(ip).GetOSOrchestrator();
+                this.osOrchestrationType = orchestrationType;
+                var lake = this.OSLakeConnector.GetOSLakeByType(osType);
+                this.OSOrchestrator = new DockerClientFromOSLake(lake.OSLakeIp).GetOSOrchestrator();
             }
             return this;
         }
-
-      
     }
 }

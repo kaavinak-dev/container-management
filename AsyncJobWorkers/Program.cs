@@ -1,9 +1,17 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Implementations;
+using OperatingSystemHelpers.Implementations.Windows;
+using OperatingSystemLake.Abstractions;
+using OperatingSystemLake.Constants;
+using OperatingSystemLake.Factory;
+using OperatingSystemLake.Implementations.Linux;
+using OperatingSystemLake.Implementations.Windows;
+using OSOrchestrator.Implementations;
 
 var builder = Host.CreateApplicationBuilder(args);
 // Register job classes
@@ -32,7 +40,18 @@ builder.Services.AddHangfireServer(options =>
     options.WorkerCount = 10;  // Number of concurrent jobs
     options.ServerName = "AsyncJobWorker";
 });
-builder.Services.AddScoped<ExecutableProcessingJobEnque>();
+
+// Register OS Lake connectors as singletons — they are stateless CLI wrappers, one per tech type
+builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(new WindowsProcessCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(new WindowsProcessCommunicator()));
+
+// Factory resolves the correct DockerClient per job based on tech type — mirrors RequestBodyParser pattern
+builder.Services.AddSingleton<IDockerClientFactory, DockerClientFactory>();
+builder.Services.AddSingleton<ContainerBuildService>(sp => new ContainerBuildService(
+    dockerClientFactory: sp.GetRequiredService<IDockerClientFactory>(),
+    sidecarPublishDir: @"c:\Users\kaavin\programming\container-management\DeploymentManager\DeploymentComponents\os-process-manager-binaries\linux"));
+
+builder.Services.AddScoped<JSProjectProcessingJobEnque>();
 
 
 var host = builder.Build();

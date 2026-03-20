@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/kaavin/programming/container-management -type f -name *.md -o -name README* -o -name docker-compose* -o -name Dockerfile*)",
+      "Bash(grep -E \"\\\\.\\(cs|csproj\\)$\")"
+    ]
+  }
+}

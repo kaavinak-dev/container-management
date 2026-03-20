@@ -8,7 +8,6 @@ package GrpcApplyServer;
 
 message CreateProcessRequest{
 	string processId=1;
-	string jobHandle=2;
 }
 
 message CreateProcessResponse{
@@ -17,11 +16,30 @@ message CreateProcessResponse{
 
 message GrpcProcess{
 	string processId=1;
-	string jobHandle=2;
 }
 
+service ProcessService {
+	rpc GetProcessDiagnostics (GetDiagnosticsRequest) returns (GetDiagnosticsResponse);
+	rpc StreamProcessDiagnostics (GetDiagnosticsRequest) returns (stream DiagnosticsEvent);
+}
 
+message GetDiagnosticsRequest {
+	string processId = 1;
+}
 
+message GetDiagnosticsResponse {
+	repeated ProcessDiagnosticEntry entries = 1;
+}
 
+message DiagnosticsEvent {
+	ProcessDiagnosticEntry entry = 1;
+	string timestamp = 2;
+}
+
+message ProcessDiagnosticEntry {
+	string key = 1;
+	string value = 2;
+	string category = 3;
+}
 
 

@@ -12,12 +12,8 @@ namespace Domain.Entities.Implementations.Windows
     {
         public static void AddWindowsDomainServices(this IServiceCollection services)
         {
-            
             services.AddTransient<OSProcessFactory, WindowsProcessFactory>();
-            services.AddTransient<OSJobFactory, WindowsJobFactory>();
-            services.AddTransient<OSProcessDiagnosticsFactory,WindowsProcessDiagnosticsFactory>();
-            services.AddTransient<BaseApplier, WindowsApplier>();
-                       
+            services.AddTransient<OSProcessDiagnosticsFactory, WindowsProcessDiagnosticsFactory>();
         }
 
     }
