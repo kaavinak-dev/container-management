@@ -6,6 +6,7 @@ using OSProcessManagerInfastructure.Grpc;
 using OSProcessManagerInfastructure.OSInfrastructure.WindowsInfrastructure;
 using OSProcessManagerInfastructure.OSInfrastructure.LinuxInfrastructure;
 using System.Runtime.InteropServices;
+using http_gateway_service.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +56,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseWebSockets();
+
 app.UseRouting();
 
 //app.UseHttpsRedirection();
@@ -65,6 +68,17 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
     endpoints.MapGrpcService<ProcessServiceImpl>();
+});
+
+app.Map("/pty", async context =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+    var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+    await PtyWebSocketHandler.HandleAsync(webSocket, context.RequestAborted);
 });
 
 app.Run();
