@@ -9,8 +9,8 @@ namespace OperatingSystemHelpers.Abstractions
 {
     public abstract class ProcessCommunicator
     {
-        protected static Process processInstance;
-        protected static bool commandProcessing;
+        protected Process processInstance;
+        protected bool commandProcessing;
         public ProcessCommunicator()
         {
         }

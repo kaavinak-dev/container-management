@@ -5,15 +5,28 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Implementations;
+using Engines.DataBaseStorageEngines;
+using Engines.DataBaseStorageEngines.Abstractions;
+using Engines.DataBaseStorageEngines.Implementations;
+using OperatingSystemHelpers.Abstractions;
 using OperatingSystemHelpers.Implementations.Windows;
+using OperatingSystemHelpers.Implementations.Linux;
 using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Constants;
 using OperatingSystemLake.Factory;
 using OperatingSystemLake.Implementations.Linux;
 using OperatingSystemLake.Implementations.Windows;
 using OSOrchestrator.Implementations;
+using System.Runtime.InteropServices;
+using Microsoft.EntityFrameworkCore;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// Selects the correct process communicator for the current OS at startup
+static ProcessCommunicator CreatePlatformCommunicator() =>
+    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? new WindowsProcessCommunicator()
+        : (ProcessCommunicator)new LinuxProcessCommunicator();
 // Register job classes
 //builder.Services.AddScoped<ExecutableProcessingJobEnque>();
 // Configure Hangfire
@@ -42,14 +55,23 @@ builder.Services.AddHangfireServer(options =>
 });
 
 // Register OS Lake connectors as singletons — they are stateless CLI wrappers, one per tech type
-builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(new WindowsProcessCommunicator()));
-builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(new WindowsProcessCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(CreatePlatformCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(CreatePlatformCommunicator()));
+
+// Register ProcessCommunicator so it can be injected into job classes (e.g. JSProjectProcessingJobEnque)
+builder.Services.AddTransient<ProcessCommunicator>(_ => CreatePlatformCommunicator());
 
 // Factory resolves the correct DockerClient per job based on tech type — mirrors RequestBodyParser pattern
 builder.Services.AddSingleton<IDockerClientFactory, DockerClientFactory>();
 builder.Services.AddSingleton<ContainerBuildService>(sp => new ContainerBuildService(
     dockerClientFactory: sp.GetRequiredService<IDockerClientFactory>(),
-    sidecarPublishDir: @"c:\Users\kaavin\programming\container-management\DeploymentManager\DeploymentComponents\os-process-manager-binaries\linux"));
+    sidecarPublishDir: builder.Configuration["SidecarPublishDir"]
+        ?? throw new InvalidOperationException("SidecarPublishDir is not configured")));
+
+builder.Services.AddDbContext<ProjectDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
+        ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
+builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
 
 builder.Services.AddScoped<JSProjectProcessingJobEnque>();
 

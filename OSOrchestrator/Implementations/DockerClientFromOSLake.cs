@@ -11,7 +11,7 @@ namespace OSOrchestrator.Implementations
 {
     public class DockerClientFromOSLake : OSOrchestratorFromOSLakeStrategy
     {
-        private static string osLakeIp;
+        private readonly string osLakeIp;
         public DockerClientFromOSLake(string _osLakeIp)
         {
             osLakeIp= _osLakeIp;
