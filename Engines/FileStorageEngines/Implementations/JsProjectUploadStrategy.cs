@@ -49,7 +49,7 @@ namespace Engines.FileStorageEngines.Implementations
                 // 6. Upload TAR.GZ to MinIO
                 using (var tarStream = File.OpenRead(tarFilePath))
                 {
-                    var objectKey = $"{projectId}/artifact.tar.gz";
+                    var objectKey = $"{projectId}.tar.gz";
                     await storageEngine.UploadProject(tarStream, bucketName, objectKey);
                 }
                 // 7. Upload metadata as separate JSON file
