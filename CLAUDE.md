@@ -1,5 +1,12 @@
 # container-management — Project Overview
 
+## Rules for Claude
+
+**Do NOT create a Pull Request under any circumstances unless the exact phrase `"Create PR"` (with double quotes) appears verbatim in the user's prompt.**
+Committing and pushing to a branch is fine at any time. Opening a PR requires that explicit phrase and nothing else counts — paraphrases like "make a PR", "open a pull request", or "submit" do not qualify.
+
+---
+
 ## What This Project Does
 
 Accepts user-uploaded JavaScript projects, scans them for viruses/vulnerabilities, and automatically builds + runs them as Docker containers. Each container also runs an internal sidecar process (`os-process-manager-service`) that exposes process diagnostics over gRPC.
