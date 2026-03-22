@@ -8,6 +8,7 @@ using OperatingSystemLake.Implementations.Linux;
 using OperatingSystemLake.Implementations.Windows;
 using System.Runtime.InteropServices;
 using OSOrchestrator.Abstractions;
+using Engines.DeploymentTracking;
 using Engines.FileStorageEngines;
 using Engines.DataBaseStorageEngines;
 using Engines.DataBaseStorageEngines.Abstractions;
@@ -16,6 +17,7 @@ using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Engines.FileStorageEngines.Implementations;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 // Selects the correct process communicator for the current OS at startup
@@ -73,6 +75,11 @@ builder.Services.AddDbContext<ProjectDbContext>(options =>
         ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
 builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
 //builder.Services.AddScoped<ExecutableProcessingJobEnque>();
+
+var redisConnection = ConnectionMultiplexer.Connect(
+    builder.Configuration.GetConnectionString("Redis") ?? "192.168.99.101:6379");
+builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+builder.Services.AddSingleton<IDeploymentProgressTracker, RedisDeploymentProgressTracker>();
 
 var app = builder.Build();
 

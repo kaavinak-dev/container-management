@@ -3,6 +3,7 @@ using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Engines.DeploymentTracking;
 using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Implementations;
 using Engines.DataBaseStorageEngines;
@@ -19,6 +20,7 @@ using OperatingSystemLake.Implementations.Windows;
 using OSOrchestrator.Implementations;
 using System.Runtime.InteropServices;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -72,6 +74,11 @@ builder.Services.AddDbContext<ProjectDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
         ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
 builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
+
+var redisConnection = ConnectionMultiplexer.Connect(
+    builder.Configuration.GetConnectionString("Redis") ?? "192.168.99.101:6379");
+builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+builder.Services.AddSingleton<IDeploymentProgressTracker, RedisDeploymentProgressTracker>();
 
 builder.Services.AddScoped<JSProjectProcessingJobEnque>();
 

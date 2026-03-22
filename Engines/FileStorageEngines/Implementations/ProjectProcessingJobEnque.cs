@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Engines.DataBaseStorageEngines.Abstractions;
 using Engines.DataBaseStorageEngines.Entities;
 using Engines.DataBaseStorageEngines.Implementations.Mappers;
+using Engines.DeploymentTracking;
 using Engines.FileStorageEngines.Abstractions;
 using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Recipes;
@@ -55,19 +56,22 @@ namespace Engines.FileStorageEngines.Implementations
         IMetadataStorageEngine? metadataStorageEngine;
         ContainerBuildService? containerBuildService;
         ProcessCommunicator? processCommunicator;
+        IDeploymentProgressTracker? progressTracker;
 
         public JSProjectProcessingJobEnque(
             IBackgroundJobClient backgroundJobClient,
             ClamAVVirusScanner localClient = null,
             IMetadataStorageEngine metadataStorageEngine = null,
             ContainerBuildService containerBuildService = null,
-            ProcessCommunicator processCommunicator = null)
+            ProcessCommunicator processCommunicator = null,
+            IDeploymentProgressTracker progressTracker = null)
         {
             this.backgroundJobClient = backgroundJobClient;
             this.virusScannerClient = localClient;
             this.metadataStorageEngine = metadataStorageEngine;
             this.containerBuildService = containerBuildService;
             this.processCommunicator = processCommunicator;
+            this.progressTracker = progressTracker;
         }
 
 
@@ -85,9 +89,16 @@ namespace Engines.FileStorageEngines.Implementations
         public override async Task DoWork(ProjectContainer programFileContainer)
         {
             var serverUrl = programFileContainer.getProjectStoredServerUrl();
+            var executableProjectId = ((JavaScriptProjectContainer)programFileContainer).ExecutableProjectId;
 
             try
             {
+                if (progressTracker != null)
+                {
+                    await progressTracker.InitializeAsync(executableProjectId);
+                    await progressTracker.SetStepRunningAsync(executableProjectId, DeploymentStepKey.Packaging);
+                }
+
                 // Split server url which is format http://url:port to get port and url info
                 var uri = new Uri(serverUrl);
                 string url = uri.Host;
@@ -114,6 +125,9 @@ namespace Engines.FileStorageEngines.Implementations
                         ? fileStream
                         : await ToMemoryStreamAsync(fileStream);
                     Console.WriteLine($"Downloaded file size: {seekable.Length} bytes");
+
+                    if (progressTracker != null)
+                        await progressTracker.SetStepCompletedAsync(executableProjectId, DeploymentStepKey.Packaging);
 
                     await ProcessProject(seekable, programFileContainer);
                 }
@@ -481,37 +495,102 @@ namespace Engines.FileStorageEngines.Implementations
 
         public override async Task ProcessProject(Stream fileStream, ProjectContainer projectContainer)
         {
-            var (virusScanResult, metadata) = await VirusScanAndExtractMetaData(fileStream, projectContainer);
             var executableProjectId = ((JavaScriptProjectContainer)projectContainer).ExecutableProjectId;
 
-            if (virusScanResult != VirusScanResults.CLEAN)
-            {
-                // Move file: original bucket → hazard; delete from original
-                await QuarantineExecutableFile(fileStream, projectContainer);
+            // --- virus-scan step ---
+            if (progressTracker != null)
+                await progressTracker.SetStepRunningAsync(executableProjectId, DeploymentStepKey.VirusScan);
 
+            var clamResult = await this.virusScannerClient.ScanFileDataAsync(fileStream);
+
+            if (clamResult != VirusScanResults.CLEAN)
+            {
+                if (progressTracker != null)
+                {
+                    await progressTracker.SetStepFailedAsync(executableProjectId, DeploymentStepKey.VirusScan, clamResult.ToString());
+                    foreach (var step in new[] { DeploymentStepKey.NpmAudit, DeploymentStepKey.ContainerBuild, DeploymentStepKey.ContainerStart })
+                        await progressTracker.SetStepSkippedAsync(executableProjectId, step);
+                }
+                fileStream.Position = 0;
+                await QuarantineExecutableFile(fileStream, projectContainer);
+                if (metadataStorageEngine != null)
+                    await metadataStorageEngine.UpdateExecutableProjectStatusAsync(executableProjectId, "quarantined", clamResult.ToString());
+                return;
+            }
+
+            if (progressTracker != null)
+                await progressTracker.SetStepCompletedAsync(executableProjectId, DeploymentStepKey.VirusScan);
+
+            // --- npm-audit step ---
+            fileStream.Position = 0;
+            var tempDir = Path.Combine(Path.GetTempPath(), projectContainer.getProjectName());
+            Directory.CreateDirectory(tempDir);
+
+            JSProjectMetadata? metadata = null;
+            VirusScanResults npmResult = VirusScanResults.CLEAN;
+
+            try
+            {
+                await ExtractTarToTemp(fileStream, tempDir);
+
+                if (progressTracker != null)
+                    await progressTracker.SetStepRunningAsync(executableProjectId, DeploymentStepKey.NpmAudit);
+
+                var (auditResult, metaObj, _) = await NodeMetaDataExtraction(tempDir);
+                metadata = (JSProjectMetadata)metaObj;
+                npmResult = auditResult;
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, recursive: true);
+            }
+
+            if (npmResult != VirusScanResults.CLEAN)
+            {
+                if (progressTracker != null)
+                {
+                    await progressTracker.SetStepFailedAsync(executableProjectId, DeploymentStepKey.NpmAudit, npmResult.ToString());
+                    foreach (var step in new[] { DeploymentStepKey.ContainerBuild, DeploymentStepKey.ContainerStart })
+                        await progressTracker.SetStepSkippedAsync(executableProjectId, step);
+                }
+                fileStream.Position = 0;
+                await QuarantineExecutableFile(fileStream, projectContainer);
                 if (metadataStorageEngine != null)
                 {
-                    await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
-                        executableProjectId, "quarantined", virusScanResult.ToString());
-                    await metadataStorageEngine.SaveMetadataAsync(
-                        executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                    await metadataStorageEngine.UpdateExecutableProjectStatusAsync(executableProjectId, "quarantined", npmResult.ToString());
+                    if (metadata != null)
+                        await metadataStorageEngine.SaveMetadataAsync(executableProjectId, metadata, new JsMetadataMapper());
                 }
                 return;
             }
 
+            if (progressTracker != null)
+                await progressTracker.SetStepCompletedAsync(executableProjectId, DeploymentStepKey.NpmAudit);
+
             // CLEAN path: update status, store metadata, then build container
             if (metadataStorageEngine != null)
             {
-                await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
-                    executableProjectId, "approved", virusScanResult.ToString());
-                await metadataStorageEngine.SaveMetadataAsync(
-                    executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                await metadataStorageEngine.UpdateExecutableProjectStatusAsync(executableProjectId, "approved", VirusScanResults.CLEAN.ToString());
+                if (metadata != null)
+                    await metadataStorageEngine.SaveMetadataAsync(executableProjectId, metadata, new JsMetadataMapper());
             }
 
+            // --- container-build + container-start steps ---
             if (containerBuildService != null)
             {
+                if (progressTracker != null)
+                    await progressTracker.SetStepRunningAsync(executableProjectId, DeploymentStepKey.ContainerBuild);
+
                 var recipe = ProjectContainerRecipeFactory.GetRecipe(projectContainer.getProjectType());
                 var result = await containerBuildService.BuildAndStartProjectContainer(fileStream, recipe, projectContainer.getProjectName());
+
+                if (progressTracker != null)
+                {
+                    await progressTracker.SetStepCompletedAsync(executableProjectId, DeploymentStepKey.ContainerBuild);
+                    await progressTracker.SetStepCompletedAsync(executableProjectId, DeploymentStepKey.ContainerStart);
+                }
+
                 if (metadataStorageEngine != null)
                     await metadataStorageEngine.UpdateContainerInfoAsync(
                         executableProjectId,
