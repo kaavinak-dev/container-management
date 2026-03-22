@@ -6,6 +6,8 @@ using OperatingSystemLake.Constants;
 
 namespace Engines.FileStorageEngines.ContainerBuild
 {
+    public record ContainerBuildResult(string ImageName, string ContainerId, string NetworkId, string NetworkName);
+
     public class ContainerBuildService
     {
         private readonly IDockerClientFactory _dockerClientFactory;
@@ -18,8 +20,8 @@ namespace Engines.FileStorageEngines.ContainerBuild
         }
 
         // Builds a project-specific Docker image (with sidecar) and starts a container from it.
-        // Returns the image name that was built.
-        public async Task<string> BuildAndStartProjectContainer(
+        // Returns image name, container ID, and Docker network info.
+        public async Task<ContainerBuildResult> BuildAndStartProjectContainer(
             Stream projectArtifactStream,
             IProjectContainerRecipe recipe,
             string projectId,
@@ -47,11 +49,22 @@ namespace Engines.FileStorageEngines.ContainerBuild
             while (!reader.EndOfStream)
                 await reader.ReadLineAsync();
 
+            var networkName = $"project-{projectId}";
+            var networkResponse = await dockerClient.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = networkName, Driver = "bridge" });
+
             var createResponse = await dockerClient.Containers.CreateContainerAsync(
                 new CreateContainerParameters
                 {
                     Image = imageName,
-                    Name = $"project-{projectId}"
+                    Name = $"project-{projectId}",
+                    NetworkingConfig = new NetworkingConfig
+                    {
+                        EndpointsConfig = new Dictionary<string, EndpointSettings>
+                        {
+                            [networkName] = new EndpointSettings()
+                        }
+                    }
                 });
 
             var started = await dockerClient.Containers.StartContainerAsync(
@@ -60,7 +73,7 @@ namespace Engines.FileStorageEngines.ContainerBuild
             if (!started)
                 throw new Exception($"Container for project '{projectId}' failed to start");
 
-            return imageName;
+            return new ContainerBuildResult(imageName, createResponse.ID, networkResponse.ID, networkName);
         }
     }
 }

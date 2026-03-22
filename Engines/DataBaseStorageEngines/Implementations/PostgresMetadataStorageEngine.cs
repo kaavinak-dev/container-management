@@ -66,6 +66,18 @@ public class PostgresMetadataStorageEngine(ProjectDbContext db) : IMetadataStora
         if (ep != null) { ep.Status = status; ep.VirusScanResult = virusScanResult; await db.SaveChangesAsync(); }
     }
 
+    public async Task UpdateContainerInfoAsync(Guid executableProjectId, string containerId, string networkId, string networkName)
+    {
+        var ep = await db.ExecutableProjects.FindAsync(executableProjectId);
+        if (ep != null)
+        {
+            ep.ContainerId = containerId;
+            ep.DockerNetworkId = networkId;
+            ep.DockerNetworkName = networkName;
+            await db.SaveChangesAsync();
+        }
+    }
+
     public async Task<TDomain?> GetMetadataAsync<TDomain, TRecord>(
         Guid executableProjectId,
         IMetadataMapper<TDomain, TRecord> mapper)
