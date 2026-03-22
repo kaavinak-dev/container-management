@@ -468,40 +468,30 @@ namespace Engines.FileStorageEngines.Implementations
         public override async Task ProcessProject(Stream fileStream, ProjectContainer projectContainer)
         {
             var (virusScanResult, metadata) = await VirusScanAndExtractMetaData(fileStream, projectContainer);
+            var executableProjectId = ((JavaScriptProjectContainer)projectContainer).ExecutableProjectId;
 
             if (virusScanResult != VirusScanResults.CLEAN)
             {
                 // Move file: original bucket → hazard; delete from original
-                var hazardContainer = await QuarantineExecutableFile(fileStream, projectContainer);
+                await QuarantineExecutableFile(fileStream, projectContainer);
 
-                // Store metadata after quarantine, reflecting hazard location
                 if (metadataStorageEngine != null)
                 {
-                    var projectId = await metadataStorageEngine.SaveProjectAsync(new ProjectRecord
-                    {
-                        ProjectName = hazardContainer.getProjectName(),
-                        ProjectType = "js",
-                        StorageUrl = hazardContainer.getProjectStoredServerUrl(),
-                        BucketName = hazardContainer.getBucketName(),
-                        VirusScanResult = virusScanResult.ToString(),
-                    });
-                    await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                    await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
+                        executableProjectId, "quarantined", virusScanResult.ToString());
+                    await metadataStorageEngine.SaveMetadataAsync(
+                        executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
                 }
                 return;
             }
 
-            // CLEAN path: store metadata at original location, then build container
+            // CLEAN path: update status, store metadata, then build container
             if (metadataStorageEngine != null)
             {
-                var projectId = await metadataStorageEngine.SaveProjectAsync(new ProjectRecord
-                {
-                    ProjectName = projectContainer.getProjectName(),
-                    ProjectType = "js",
-                    StorageUrl = projectContainer.getProjectStoredServerUrl(),
-                    BucketName = projectContainer.getBucketName(),
-                    VirusScanResult = virusScanResult.ToString(),
-                });
-                await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
+                    executableProjectId, "approved", virusScanResult.ToString());
+                await metadataStorageEngine.SaveMetadataAsync(
+                    executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
             }
 
             if (containerBuildService != null)

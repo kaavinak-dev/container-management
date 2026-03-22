@@ -67,6 +67,13 @@ builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine
 
 var app = builder.Build();
 
+// Approach A: auto-migrate DB on startup — creates all tables fresh on first boot, no-op after
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<IMetadataStorageEngine>();
+    await db.MigrateAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
