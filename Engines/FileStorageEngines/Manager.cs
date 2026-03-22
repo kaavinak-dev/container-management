@@ -169,7 +169,8 @@ namespace Engines.FileStorageEngines
 
         public ProjectStorageEngine GetFileStorageEngine()
         {
-            return StorageEngine;
+            // Election disabled — always use first configured engine
+            return storageEngines.FirstOrDefault();
         }
 
         public void SetFileStorageEngine(ProjectStorageEngine electedStorageEngine)
@@ -278,71 +279,8 @@ namespace Engines.FileStorageEngines
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
-
-
-            try
-            {
-                if (!stoppingToken.IsCancellationRequested)
-                {
-                    List<Dictionary<string, object>> engineStatusObjects = new();
-
-                    foreach (var engine in engineManagerInstance.GetStorageEngines())
-                    {
-                        try
-                        {
-                            engineStatusObjects.Add(await EngineInfoCheck(engine, stoppingToken));
-                        }
-                        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                        {
-                            return;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error checking engine: {ex.Message}");
-                        }
-                    }
-                    var electedStorageEngine = ElectBestEngine(engineStatusObjects);
-                    engineManagerInstance.SetFileStorageEngine(electedStorageEngine);
-
-
-                }
-                while (await timer.WaitForNextTickAsync(stoppingToken))
-                {
-
-                    if (stoppingToken.IsCancellationRequested) { break; }
-                    List<Dictionary<string, object>> engineStatusObjects = new();
-
-                    foreach (var engine in engineManagerInstance.GetStorageEngines())
-                    {
-                        try
-                        {
-                            engineStatusObjects.Add(await EngineInfoCheck(engine, stoppingToken));
-                        }
-                        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                        {
-                            return;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error checking engine: {ex.Message}");
-                        }
-                    }
-                    var electedStorageEngine = ElectBestEngine(engineStatusObjects);
-                    engineManagerInstance.SetFileStorageEngine(electedStorageEngine);
-
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-
-            }
-            catch (Exception ex)
-            {
-
-                throw ex;
-
-            }
+            // Election disabled — GetFileStorageEngine() returns first engine directly
+            await Task.CompletedTask;
         }
 
         private async Task<Dictionary<string, object>> EngineInfoCheck(ProjectStorageEngine engine, CancellationToken cancelToken)

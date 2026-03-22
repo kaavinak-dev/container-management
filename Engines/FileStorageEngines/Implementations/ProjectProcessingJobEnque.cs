@@ -482,62 +482,30 @@ namespace Engines.FileStorageEngines.Implementations
         public override async Task ProcessProject(Stream fileStream, ProjectContainer projectContainer)
         {
             var (virusScanResult, metadata) = await VirusScanAndExtractMetaData(fileStream, projectContainer);
+            var executableProjectId = ((JavaScriptProjectContainer)projectContainer).ExecutableProjectId;
 
             if (virusScanResult != VirusScanResults.CLEAN)
             {
                 // Move file: original bucket → hazard; delete from original
-                var hazardContainer = await QuarantineExecutableFile(fileStream, projectContainer);
+                await QuarantineExecutableFile(fileStream, projectContainer);
 
-                // Store metadata after quarantine, reflecting hazard location
                 if (metadataStorageEngine != null)
                 {
-                    var projectId = await metadataStorageEngine.SaveProjectAsync(new ProjectRecord
-                    {
-                        ProjectName = hazardContainer.getProjectName(),
-                        ProjectType = "js",
-                        StorageUrl = hazardContainer.getProjectStoredServerUrl(),
-                        BucketName = hazardContainer.getBucketName(),
-                        VirusScanResult = virusScanResult.ToString(),
-                    });
-                    await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
-                    // H1: persist risk assessment — ClamAV-detected virus is always CRITICAL/REJECT
-                    await metadataStorageEngine.SaveRiskAssessmentAsync(projectId, new RiskAssessmentRecord
-                    {
-                        ProjectId = projectId,
-                        RiskLevel = "CRITICAL",
-                        RiskScore = 100,
-                        Action = "REJECT",
-                        IssuesJson = JsonSerializer.Serialize(new List<string> { "CRITICAL: ClamAV virus signature detected" })
-                    });
+                    await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
+                        executableProjectId, "quarantined", virusScanResult.ToString());
+                    await metadataStorageEngine.SaveMetadataAsync(
+                        executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
                 }
                 return;
             }
 
-            // CLEAN path: store metadata at original location, then build container
+            // CLEAN path: update status, store metadata, then build container
             if (metadataStorageEngine != null)
             {
-                var projectId = await metadataStorageEngine.SaveProjectAsync(new ProjectRecord
-                {
-                    ProjectName = projectContainer.getProjectName(),
-                    ProjectType = "js",
-                    StorageUrl = projectContainer.getProjectStoredServerUrl(),
-                    BucketName = projectContainer.getBucketName(),
-                    VirusScanResult = virusScanResult.ToString(),
-                });
-                await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
-                // H1: persist risk assessment for clean projects
-                if (metadata is JSProjectMetadata jsMeta)
-                {
-                    var risk = AssessProject(jsMeta);
-                    await metadataStorageEngine.SaveRiskAssessmentAsync(projectId, new RiskAssessmentRecord
-                    {
-                        ProjectId = projectId,
-                        RiskLevel = risk.RiskLevel ?? "LOW",
-                        RiskScore = risk.RiskScore,
-                        Action = risk.Action,
-                        IssuesJson = JsonSerializer.Serialize(risk.Issues ?? new List<string>())
-                    });
-                }
+                await metadataStorageEngine.UpdateExecutableProjectStatusAsync(
+                    executableProjectId, "approved", virusScanResult.ToString());
+                await metadataStorageEngine.SaveMetadataAsync(
+                    executableProjectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
             }
 
             if (containerBuildService != null)
