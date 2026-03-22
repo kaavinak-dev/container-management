@@ -169,8 +169,7 @@ namespace Engines.FileStorageEngines
 
         public ProjectStorageEngine GetFileStorageEngine()
         {
-            // Election disabled — always use first configured engine
-            return storageEngines.FirstOrDefault();
+            return StorageEngine ?? storageEngines.FirstOrDefault();
         }
 
         public void SetFileStorageEngine(ProjectStorageEngine electedStorageEngine)
@@ -279,8 +278,24 @@ namespace Engines.FileStorageEngines
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Election disabled — GetFileStorageEngine() returns first engine directly
-            await Task.CompletedTask;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var healthTasks = engineManagerInstance.GetStorageEngines()
+                    .Select(e => EngineInfoCheck(e, stoppingToken))
+                    .ToList();
+
+                var results = await Task.WhenAll(healthTasks);
+                var validResults = results.Where(r => r is not null).ToList();
+
+                if (validResults.Any())
+                {
+                    var best = ElectBestEngine(validResults);
+                    if (best is not null)
+                        engineManagerInstance.SetFileStorageEngine(best);
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            }
         }
 
         private async Task<Dictionary<string, object>> EngineInfoCheck(ProjectStorageEngine engine, CancellationToken cancelToken)

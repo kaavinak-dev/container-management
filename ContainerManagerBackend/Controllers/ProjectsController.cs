@@ -42,6 +42,7 @@ public class ProjectsController : ControllerBase
             projectName = record.ProjectName,
             projectType = record.ProjectType,
             status = record.Status,
+            storageUrl = record.StorageUrl,
         });
     }
 
@@ -53,6 +54,7 @@ public class ProjectsController : ControllerBase
         return Ok(projects.Select(p => new {
             projectId = p.Id, projectName = p.ProjectName,
             projectType = p.ProjectType, status = p.Status, createdAt = p.UploadDate,
+            storageUrl = p.StorageUrl,
         }));
     }
 
@@ -65,6 +67,7 @@ public class ProjectsController : ControllerBase
         return Ok(new {
             projectId = p.Id, projectName = p.ProjectName,
             projectType = p.ProjectType, status = p.Status, createdAt = p.UploadDate,
+            storageUrl = p.StorageUrl,
         });
     }
 
