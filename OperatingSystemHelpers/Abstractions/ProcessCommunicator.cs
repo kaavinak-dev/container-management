@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace OperatingSystemHelpers.Abstractions
 {
-    public abstract class ProcessCommunicator
+    public abstract class ProcessCommunicator : IDisposable
     {
         protected Process processInstance;
         protected bool commandProcessing;
@@ -22,5 +22,9 @@ namespace OperatingSystemHelpers.Abstractions
         public abstract void EndTransaction();
         public abstract void EndProcess();
 
+        public void Dispose()
+        {
+            processInstance?.Dispose();
+        }
     }
 }

@@ -108,9 +108,14 @@ namespace Engines.FileStorageEngines.Implementations
                     programFileContainer.getBucketName(),
                     programFileContainer.getProjectArtifactName()))
                 {
-                    Console.WriteLine($"Downloaded file size: {fileStream.Length} bytes");
+                    // Ensure seekable — downstream code resets Position multiple times;
+                    // guard against future SDK changes that may return a non-seekable stream.
+                    Stream seekable = fileStream.CanSeek
+                        ? fileStream
+                        : await ToMemoryStreamAsync(fileStream);
+                    Console.WriteLine($"Downloaded file size: {seekable.Length} bytes");
 
-                    await ProcessProject(fileStream, programFileContainer);
+                    await ProcessProject(seekable, programFileContainer);
                 }
 
                 Console.WriteLine($"Completed processing: {programFileContainer.getProjectName()}");
@@ -185,7 +190,7 @@ namespace Engines.FileStorageEngines.Implementations
             {
                 if (Directory.Exists(tempDir))
                 {
-                    Directory.Delete(tempDir);
+                    Directory.Delete(tempDir, recursive: true);
                 }
             }
 
@@ -302,6 +307,8 @@ namespace Engines.FileStorageEngines.Implementations
             // Wait for all commands to complete
             comm.EndTransaction();
             comm.EndProcess();
+            if (comm is IDisposable disposableComm)
+                disposableComm.Dispose();
             // Parse all collected data
             var metadata = new JSProjectMetadata();
             // Parse audit data
@@ -543,6 +550,14 @@ namespace Engines.FileStorageEngines.Implementations
         public override void EnqueJob(ProjectContainer executablFileContainer)
         {
             this.backgroundJobClient.Enqueue(() => this.DoWork(executablFileContainer));
+        }
+
+        private static async Task<MemoryStream> ToMemoryStreamAsync(Stream source)
+        {
+            var ms = new MemoryStream();
+            await source.CopyToAsync(ms);
+            ms.Position = 0;
+            return ms;
         }
     }
 
