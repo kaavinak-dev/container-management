@@ -10,6 +10,9 @@ public class ExecutableProject
     public string Status { get; set; } = "pending"; // pending | approved | quarantined | rejected
     public string? VirusScanResult { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? ContainerId { get; set; }
+    public string? DockerNetworkId { get; set; }
+    public string? DockerNetworkName { get; set; }
     public ProjectRecord SourceProject { get; set; } = null!;
     public ICollection<RiskAssessmentRecord> RiskAssessments { get; set; } = [];
 }

@@ -511,7 +511,13 @@ namespace Engines.FileStorageEngines.Implementations
             if (containerBuildService != null)
             {
                 var recipe = ProjectContainerRecipeFactory.GetRecipe(projectContainer.getProjectType());
-                await containerBuildService.BuildAndStartProjectContainer(fileStream, recipe, projectContainer.getProjectName());
+                var result = await containerBuildService.BuildAndStartProjectContainer(fileStream, recipe, projectContainer.getProjectName());
+                if (metadataStorageEngine != null)
+                    await metadataStorageEngine.UpdateContainerInfoAsync(
+                        executableProjectId,
+                        result.ContainerId,
+                        result.NetworkId,
+                        result.NetworkName);
             }
         }
 

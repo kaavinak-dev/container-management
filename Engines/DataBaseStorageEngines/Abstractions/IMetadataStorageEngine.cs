@@ -15,6 +15,7 @@ public interface IMetadataStorageEngine
     Task DeleteProjectAsync(Guid projectId);
     Task<Guid> SaveExecutableProjectAsync(ExecutableProject executableProject);
     Task UpdateExecutableProjectStatusAsync(Guid executableProjectId, string status, string? virusScanResult);
+    Task UpdateContainerInfoAsync(Guid executableProjectId, string containerId, string networkId, string networkName);
     Task<TDomain?> GetMetadataAsync<TDomain, TRecord>(Guid executableProjectId, IMetadataMapper<TDomain, TRecord> mapper)
         where TDomain : ProjectMetaData
         where TRecord : class, IProjectForeignKey;
