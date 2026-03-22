@@ -55,7 +55,7 @@ builder.Services.AddSingleton<ProjectStorageManager>(serviceProvider =>
             {"SecretKey","minioadmin"}
         }
     };
-    return new ProjectStorageManager(fileServers);
+    return new ProjectStorageManager(fileServers, isDevEnv: builder.Environment.IsDevelopment());
 
 });
 builder.Services.AddHostedService<ProjectStorageEngineBackgroundService>();
