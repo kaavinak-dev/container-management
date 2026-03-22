@@ -108,15 +108,13 @@ namespace Engines.FileStorageEngines.Implementations
 
         }
 
-        private void CreateExecutableBucket(string bucketName)
+        private async Task CreateExecutableBucket(string bucketName)
         {
-            bool bucketExists = _client.BucketExistsAsync(new Minio.DataModel.Args.BucketExistsArgs().WithBucket(bucketName)).GetAwaiter().GetResult();
+            bool bucketExists = await _client.BucketExistsAsync(new Minio.DataModel.Args.BucketExistsArgs().WithBucket(bucketName));
             if (!bucketExists)
             {
-                _client.MakeBucketAsync(new Minio.DataModel.Args.MakeBucketArgs().WithBucket(bucketName));
-
+                await _client.MakeBucketAsync(new Minio.DataModel.Args.MakeBucketArgs().WithBucket(bucketName));
             }
-
         }
 
         public async Task<Stream> DownloadProject(string bucketName, string projectName)

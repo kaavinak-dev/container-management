@@ -51,7 +51,7 @@ namespace OperatingSystemHelpers.Implementations.Linux
             };
             processInstance.ErrorDataReceived += (err, eventMsg) =>
             {
-                if (commandOutputHandler != null)
+                if (commandErrorHandler != null)
                 {
                     if (eventMsg.Data == null || eventMsg.Data.Contains("_END_"))
                     {
@@ -114,6 +114,8 @@ namespace OperatingSystemHelpers.Implementations.Linux
         public override void EndProcess()
         {
             processInstance.Kill();
+            processInstance.WaitForExit(5000);
+            processInstance.Dispose();
         }
     }
 }

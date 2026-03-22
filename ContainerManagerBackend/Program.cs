@@ -1,9 +1,12 @@
 using ContainerManagerBackend.Helpers;
 using ContainerManagerBackend.Services;
+using OperatingSystemHelpers.Abstractions;
 using OperatingSystemHelpers.Implementations.Windows;
+using OperatingSystemHelpers.Implementations.Linux;
 using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Implementations.Linux;
 using OperatingSystemLake.Implementations.Windows;
+using System.Runtime.InteropServices;
 using OSOrchestrator.Abstractions;
 using Engines.FileStorageEngines;
 using Engines.DataBaseStorageEngines;
@@ -15,6 +18,12 @@ using Engines.FileStorageEngines.Implementations;
 using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
+// Selects the correct process communicator for the current OS at startup
+static ProcessCommunicator CreatePlatformCommunicator() =>
+    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? new WindowsProcessCommunicator()
+        : (ProcessCommunicator)new LinuxProcessCommunicator();
+
 // Add services to the container.
 //var singletonPreConfigureServicesBuilder = new SingletonServicesPreConfigurationBuilder();
 //singletonPreConfigureServicesBuilder.ConfigureOSLakeOrchestrator(OperatingSystemLake.Constants.OSLakeTechTypes.VirtualBox).ConfigureOSOrchestrator(OSOrchestrator.Constants.OSOrchestratorTypes.Docker);
@@ -24,8 +33,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //builder.Services.AddSingleton<OSLakeOrchestrator>(singletonPreConfigureServicesBuilder.OSLakeOrchestrator);
 //builder.Services.AddSingleton<OSOrchestrator.Abstractions.OSOrchestrator>(singletonPreConfigureServicesBuilder.OSOrchestrator);
-builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(new WindowsProcessCommunicator()));
-builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(new WindowsProcessCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(CreatePlatformCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(CreatePlatformCommunicator()));
 builder.Services.AddScoped<RequestBodyParser>();
 //builder.Services.AddSingleton<FileStorageManager>();
 builder.Services.AddSingleton<ProjectStorageManager>(serviceProvider =>
@@ -46,7 +55,7 @@ builder.Services.AddSingleton<ProjectStorageManager>(serviceProvider =>
             {"SecretKey","minioadmin"}
         }
     };
-    return new ProjectStorageManager(fileServers);
+    return new ProjectStorageManager(fileServers, isDevEnv: builder.Environment.IsDevelopment());
 
 });
 builder.Services.AddHostedService<ProjectStorageEngineBackgroundService>();

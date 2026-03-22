@@ -16,7 +16,7 @@ using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Recipes;
 using Hangfire;
 using OperatingSystemHelpers;
-using OperatingSystemHelpers.Implementations.Windows;
+using OperatingSystemHelpers.Abstractions;
 
 namespace Engines.FileStorageEngines.Implementations
 {
@@ -54,17 +54,20 @@ namespace Engines.FileStorageEngines.Implementations
         FileVirusScanner<ClamAVClient, VirusScanResults> virusScannerClient;
         IMetadataStorageEngine? metadataStorageEngine;
         ContainerBuildService? containerBuildService;
+        ProcessCommunicator? processCommunicator;
 
         public JSProjectProcessingJobEnque(
             IBackgroundJobClient backgroundJobClient,
             ClamAVVirusScanner localClient = null,
             IMetadataStorageEngine metadataStorageEngine = null,
-            ContainerBuildService containerBuildService = null)
+            ContainerBuildService containerBuildService = null,
+            ProcessCommunicator processCommunicator = null)
         {
             this.backgroundJobClient = backgroundJobClient;
             this.virusScannerClient = localClient;
             this.metadataStorageEngine = metadataStorageEngine;
             this.containerBuildService = containerBuildService;
+            this.processCommunicator = processCommunicator;
         }
 
 
@@ -105,9 +108,14 @@ namespace Engines.FileStorageEngines.Implementations
                     programFileContainer.getBucketName(),
                     programFileContainer.getProjectArtifactName()))
                 {
-                    Console.WriteLine($"Downloaded file size: {fileStream.Length} bytes");
+                    // Ensure seekable — downstream code resets Position multiple times;
+                    // guard against future SDK changes that may return a non-seekable stream.
+                    Stream seekable = fileStream.CanSeek
+                        ? fileStream
+                        : await ToMemoryStreamAsync(fileStream);
+                    Console.WriteLine($"Downloaded file size: {seekable.Length} bytes");
 
-                    await ProcessProject(fileStream, programFileContainer);
+                    await ProcessProject(seekable, programFileContainer);
                 }
 
                 Console.WriteLine($"Completed processing: {programFileContainer.getProjectName()}");
@@ -158,7 +166,10 @@ namespace Engines.FileStorageEngines.Implementations
             var virusResult = await this.virusScannerClient.ScanFileDataAsync(tarStream);
             if (virusResult != VirusScanResults.CLEAN)
             {
-                return (VirusScanResults.VIRUS, new JSProjectMetadata());
+                return (VirusScanResults.VIRUS, new JSProjectMetadata
+                {
+                    ProjectName = projectContainer.getProjectName()
+                });
             }
             tarStream.Position = 0;
             var tempDir = Path.Combine(Path.GetTempPath(), projectContainer.getProjectName());
@@ -179,7 +190,7 @@ namespace Engines.FileStorageEngines.Implementations
             {
                 if (Directory.Exists(tempDir))
                 {
-                    Directory.Delete(tempDir);
+                    Directory.Delete(tempDir, recursive: true);
                 }
             }
 
@@ -217,15 +228,16 @@ namespace Engines.FileStorageEngines.Implementations
 
         public async Task<(VirusScanResults, ProjectMetaData, RiskAssessment)> NodeMetaDataExtraction(string nodeProjectPath)
         {
-            var processCommunicator = new WindowsProcessCommunicator();
-            processCommunicator.StartProcess(nodeProjectPath);
-            processCommunicator.StartTransaction();
+            var comm = this.processCommunicator
+                ?? throw new InvalidOperationException("ProcessCommunicator not injected — cannot run npm commands");
+            comm.StartProcess(nodeProjectPath);
+            comm.StartTransaction();
             var auditData = "";
             var listData = "";
             var configData = "";
             var packData = "";
             // 1. npm audit --json
-            processCommunicator.ExecuteCommand("npm audit --json",
+            comm.ExecuteCommand("npm audit --json",
                 (err, outputLogs) =>
                 {
                     if (outputLogs.Data != null)
@@ -242,7 +254,7 @@ namespace Engines.FileStorageEngines.Implementations
                     }
                 });
             // 2. npm list --json --depth=0
-            processCommunicator.ExecuteCommand("npm list --json --depth=0",
+            comm.ExecuteCommand("npm list --json --depth=0",
                 (err, outputLogs) =>
                 {
                     if (outputLogs.Data != null)
@@ -259,7 +271,7 @@ namespace Engines.FileStorageEngines.Implementations
                     }
                 });
             // 3. npm config list --json
-            processCommunicator.ExecuteCommand("npm config list --json",
+            comm.ExecuteCommand("npm config list --json",
                 (err, outputLogs) =>
                 {
                     if (outputLogs.Data != null)
@@ -276,7 +288,7 @@ namespace Engines.FileStorageEngines.Implementations
                     }
                 });
             // 4. npm pack --dry-run --json
-            processCommunicator.ExecuteCommand("npm pack --dry-run --json",
+            comm.ExecuteCommand("npm pack --dry-run --json",
                 (err, outputLogs) =>
                 {
                     if (outputLogs.Data != null)
@@ -293,8 +305,10 @@ namespace Engines.FileStorageEngines.Implementations
                     }
                 });
             // Wait for all commands to complete
-            processCommunicator.EndTransaction();
-            processCommunicator.EndProcess();
+            comm.EndTransaction();
+            comm.EndProcess();
+            if (comm is IDisposable disposableComm)
+                disposableComm.Dispose();
             // Parse all collected data
             var metadata = new JSProjectMetadata();
             // Parse audit data
@@ -504,6 +518,14 @@ namespace Engines.FileStorageEngines.Implementations
         public override void EnqueJob(ProjectContainer executablFileContainer)
         {
             this.backgroundJobClient.Enqueue(() => this.DoWork(executablFileContainer));
+        }
+
+        private static async Task<MemoryStream> ToMemoryStreamAsync(Stream source)
+        {
+            var ms = new MemoryStream();
+            await source.CopyToAsync(ms);
+            ms.Position = 0;
+            return ms;
         }
     }
 

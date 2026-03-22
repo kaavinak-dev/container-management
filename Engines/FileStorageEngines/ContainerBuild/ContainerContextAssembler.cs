@@ -58,6 +58,12 @@ kill $USER_PID";
             }
 
             // Add entire sidecar publish directory — mirrors how the sidecar Dockerfile does COPY . .
+            if (!Directory.Exists(sidecarPublishDir))
+                throw new DirectoryNotFoundException(
+                    $"Sidecar publish directory not found: '{sidecarPublishDir}'. " +
+                    "Run 'dotnet publish' on the os-process-manager-service project first, " +
+                    "then set SidecarPublishDir in appsettings.json to the publish output path.");
+
             foreach (var file in Directory.EnumerateFiles(sidecarPublishDir, "*", SearchOption.AllDirectories))
             {
                 var relative = Path.GetRelativePath(sidecarPublishDir, file).Replace('\\', '/');
