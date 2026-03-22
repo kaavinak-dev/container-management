@@ -52,11 +52,11 @@ namespace OperatingSystemHelpers.Implementations.Windows
             };
             processInstance.ErrorDataReceived += (err, eventMsg) =>
             {
-                if (commandOutputHandler != null)
+                if (commandErrorHandler != null)
                 {
                     if (eventMsg.Data == null || eventMsg.Data.Contains("_END_"))
                     {
-                        processInstance.ErrorDataReceived -= commandOutputHandler;
+                        processInstance.ErrorDataReceived -= commandErrorHandler;
                         commandProcessing = false;
                     }
                 }
@@ -122,6 +122,8 @@ namespace OperatingSystemHelpers.Implementations.Windows
         public override void EndProcess()
         {
             processInstance.Kill();
+            processInstance.WaitForExit(5000);
+            processInstance.Dispose();
         }
     }
 }
