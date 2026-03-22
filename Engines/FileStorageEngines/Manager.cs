@@ -37,14 +37,14 @@ namespace Engines.FileStorageEngines
 
     public class ProjectStorageManager : IProjectStorageManager
     {
-        private static List<ProjectStorageEngine> storageEngines;
-        private static ProjectStorageEngine StorageEngine;
-        private static bool isDevEnv = true;
-        private static bool server_clients_generated = false;
+        private List<ProjectStorageEngine> storageEngines;
+        private ProjectStorageEngine StorageEngine;
+        private bool isDevEnv;
+        private bool server_clients_generated = false;
 
-        public ProjectStorageManager(List<Dictionary<string, string>> config)
+        public ProjectStorageManager(List<Dictionary<string, string>> config, bool isDevEnv = false)
         {
-
+            this.isDevEnv = isDevEnv;
             if (storageEngines == null || storageEngines.Count <= 0)
             {
                 storageEngines = FetchCurrentRunningStorageEngines(config);
@@ -86,7 +86,9 @@ namespace Engines.FileStorageEngines
             {
                 return FetchCurrentRunningStorageEnginesDevEnv(config);
             }
-            return null;
+            throw new NotImplementedException(
+                "Production MinIO discovery via Docker API is not yet implemented. " +
+                "Pass isDevEnv: true and provide explicit server config, or implement the production path.");
             // string infraUri = "tcp://{Ip}:2375";
             // var uri = new Uri(infraUri);
             // var dockerClient = new DockerClientConfiguration(uri).CreateClient();
@@ -276,7 +278,7 @@ namespace Engines.FileStorageEngines
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(250000));
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
 
 
             try

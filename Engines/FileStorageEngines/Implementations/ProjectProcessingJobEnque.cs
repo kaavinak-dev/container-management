@@ -161,7 +161,10 @@ namespace Engines.FileStorageEngines.Implementations
             var virusResult = await this.virusScannerClient.ScanFileDataAsync(tarStream);
             if (virusResult != VirusScanResults.CLEAN)
             {
-                return (VirusScanResults.VIRUS, new JSProjectMetadata());
+                return (VirusScanResults.VIRUS, new JSProjectMetadata
+                {
+                    ProjectName = projectContainer.getProjectName()
+                });
             }
             tarStream.Position = 0;
             var tempDir = Path.Combine(Path.GetTempPath(), projectContainer.getProjectName());
@@ -490,6 +493,15 @@ namespace Engines.FileStorageEngines.Implementations
                         VirusScanResult = virusScanResult.ToString(),
                     });
                     await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                    // H1: persist risk assessment — ClamAV-detected virus is always CRITICAL/REJECT
+                    await metadataStorageEngine.SaveRiskAssessmentAsync(projectId, new RiskAssessmentRecord
+                    {
+                        ProjectId = projectId,
+                        RiskLevel = "CRITICAL",
+                        RiskScore = 100,
+                        Action = "REJECT",
+                        IssuesJson = JsonSerializer.Serialize(new List<string> { "CRITICAL: ClamAV virus signature detected" })
+                    });
                 }
                 return;
             }
@@ -506,6 +518,19 @@ namespace Engines.FileStorageEngines.Implementations
                     VirusScanResult = virusScanResult.ToString(),
                 });
                 await metadataStorageEngine.SaveMetadataAsync(projectId, (JSProjectMetadata)metadata, new JsMetadataMapper());
+                // H1: persist risk assessment for clean projects
+                if (metadata is JSProjectMetadata jsMeta)
+                {
+                    var risk = AssessProject(jsMeta);
+                    await metadataStorageEngine.SaveRiskAssessmentAsync(projectId, new RiskAssessmentRecord
+                    {
+                        ProjectId = projectId,
+                        RiskLevel = risk.RiskLevel ?? "LOW",
+                        RiskScore = risk.RiskScore,
+                        Action = risk.Action,
+                        IssuesJson = JsonSerializer.Serialize(risk.Issues ?? new List<string>())
+                    });
+                }
             }
 
             if (containerBuildService != null)
