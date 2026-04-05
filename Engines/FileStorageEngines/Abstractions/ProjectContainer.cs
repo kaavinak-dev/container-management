@@ -23,7 +23,8 @@ namespace Engines.FileStorageEngines.Abstractions
         protected string projectName;
         protected string bucketName;
         protected string serverUrl;
-
+        public Guid ExecutableProjectId { get; set; }
+        public Guid ProjectId { get;set;}
 
         public ProjectContainer(string _projectName, string _bucketName, string _serverUrl)
         {

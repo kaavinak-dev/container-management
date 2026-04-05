@@ -22,6 +22,53 @@ namespace Engines.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ExecutableProject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ArtifactBucket")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ArtifactName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DockerNetworkId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DockerNetworkName")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SourceProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StorageUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VirusScanResult")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceProjectId");
+
+                    b.ToTable("executable_projects", (string)null);
+                });
+
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.JsDependencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -86,6 +133,8 @@ namespace Engines.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProjectId");
+
                     b.ToTable("js_project_metadata", (string)null);
                 });
 
@@ -134,15 +183,16 @@ namespace Engines.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("StorageUrl")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("UploadDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("VirusScanResult")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -162,12 +212,12 @@ namespace Engines.Migrations
                     b.Property<DateTime>("AssessedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ExecutableProjectId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("IssuesJson")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("RiskLevel")
                         .IsRequired()
@@ -178,9 +228,20 @@ namespace Engines.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId");
+                    b.HasIndex("ExecutableProjectId");
 
                     b.ToTable("risk_assessments", (string)null);
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ExecutableProject", b =>
+                {
+                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ProjectRecord", "SourceProject")
+                        .WithMany("ExecutableProjects")
+                        .HasForeignKey("SourceProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SourceProject");
                 });
 
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.JsDependencyRecord", b =>
@@ -192,6 +253,15 @@ namespace Engines.Migrations
                         .IsRequired();
 
                     b.Navigation("JsMetadata");
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.JsMetadataRecord", b =>
+                {
+                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ExecutableProject", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.JsVulnerabilityRecord", b =>
@@ -207,13 +277,18 @@ namespace Engines.Migrations
 
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.RiskAssessmentRecord", b =>
                 {
-                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ProjectRecord", "Project")
+                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ExecutableProject", "ExecutableProject")
                         .WithMany("RiskAssessments")
-                        .HasForeignKey("ProjectId")
+                        .HasForeignKey("ExecutableProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Project");
+                    b.Navigation("ExecutableProject");
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ExecutableProject", b =>
+                {
+                    b.Navigation("RiskAssessments");
                 });
 
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.JsMetadataRecord", b =>
@@ -225,8 +300,55 @@ namespace Engines.Migrations
 
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ProjectRecord", b =>
                 {
-                    b.Navigation("RiskAssessments");
+                    b.Navigation("ExecutableProjects");
                 });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.EditorSessionRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy",
+                            NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("WorkspaceVolume")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NpmCacheVolume")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerIp")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LastActive")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.ToTable("editor_sessions", (string)null);
+                });
+
 #pragma warning restore 612, 618
         }
     }

@@ -3,8 +3,10 @@ using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Constants;
 using OperatingSystemLake.Implementations.AWS;
 using OperatingSystemLake.Implementations.Linux;
+using OperatingSystemLake.Implementations.Local;
 using OperatingSystemLake.Implementations.Windows;
 using OSOrchestrator.Implementations;
+using System.Runtime.InteropServices;
 
 namespace Engines.FileStorageEngines.ContainerBuild;
 
@@ -17,6 +19,16 @@ public class DockerClientFactory : IDockerClientFactory
 
     public DockerClient CreateForLake(OSLakeTechTypes techType, OSLakeTypes osType)
     {
+        // LocalDocker bypasses the OSLake connector chain entirely — Docker Desktop
+        // is always local and reachable via named pipe (Windows) or Unix socket (Linux/Mac).
+        if (techType == OSLakeTechTypes.LocalDocker)
+        {
+            var uri = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? new Uri("npipe://./pipe/docker_engine")
+                : new Uri("unix:///var/run/docker.sock");
+            return new DockerClientConfiguration(uri).CreateClient();
+        }
+
         var connector = techType switch
         {
             OSLakeTechTypes.DockerMachine => _connectors.FirstOrDefault(c => c is DockerMachineOSLakeConnector),

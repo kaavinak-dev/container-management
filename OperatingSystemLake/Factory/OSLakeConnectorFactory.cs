@@ -3,6 +3,7 @@ using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Constants;
 using OperatingSystemLake.Implementations.AWS;
 using OperatingSystemLake.Implementations.Linux;
+using OperatingSystemLake.Implementations.Local;
 using OperatingSystemLake.Implementations.Windows;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,7 @@ namespace OperatingSystemLake.Factory
                 OSLakeTechTypes.DockerMachine => new DockerMachineOSLakeConnector(processCommunicator
                     ?? throw new ArgumentNullException(nameof(processCommunicator), "DockerMachine connector requires a ProcessCommunicator")),
                 OSLakeTechTypes.Aws           => new AwsOSLakeConnector(),
+                OSLakeTechTypes.LocalDocker   => new LocalDockerOSLakeConnector(),
                 _ => throw new NotSupportedException($"OS Lake tech type '{techType}' is not supported.")
             };
         }

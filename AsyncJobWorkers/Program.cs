@@ -21,6 +21,7 @@ using OSOrchestrator.Implementations;
 using System.Runtime.InteropServices;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+using Microsoft.Extensions.Configuration;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -36,7 +37,7 @@ builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseRedisStorage("192.168.99.101:6379", new RedisStorageOptions
+    .UseRedisStorage(builder.Configuration.GetConnectionString("Redis")!, new RedisStorageOptions
     {
         Prefix = "hangfire:",
         ExpiryCheckInterval = TimeSpan.FromHours(1)
@@ -46,7 +47,9 @@ builder.Services.AddHangfire(configuration => configuration
 
 builder.Services.AddSingleton<ClamAVClient>(serviceProvider =>
 {
-    return new ClamAVClient("192.168.99.101", 3310);
+    return new ClamAVClient(
+        builder.Configuration["ClamAV:Host"]!,
+        builder.Configuration.GetValue<int>("ClamAV:Port"));
 });
 
 // Listener 1: Critical queue only (high priority)
@@ -71,12 +74,11 @@ builder.Services.AddSingleton<ContainerBuildService>(sp => new ContainerBuildSer
         ?? throw new InvalidOperationException("SidecarPublishDir is not configured")));
 
 builder.Services.AddDbContext<ProjectDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
-        ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")!));
 builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
 
 var redisConnection = ConnectionMultiplexer.Connect(
-    builder.Configuration.GetConnectionString("Redis") ?? "192.168.99.101:6379");
+    builder.Configuration.GetConnectionString("Redis")!);
 builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
 builder.Services.AddSingleton<IDeploymentProgressTracker, RedisDeploymentProgressTracker>();
 

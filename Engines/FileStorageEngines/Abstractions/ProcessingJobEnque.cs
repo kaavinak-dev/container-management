@@ -13,8 +13,8 @@ namespace Engines.FileStorageEngines.Abstractions
 
         public abstract bool isValidProject(Stream fileStreamData);
         public abstract List<string> getProjectFileExtensionsSupported();
-        public abstract Task DoWork(ProjectContainer projectToProcess);
-        public abstract void EnqueJob(ProjectContainer projectToProcess);
+        public abstract Task DoWork(Guid projectId);
+        public abstract void EnqueJob(Guid projectId);
         public abstract Task ProcessProject(Stream streamData, ProjectContainer projectContainer);
         public abstract Task<(VirusScanResults, ProjectMetaData)> VirusScanAndExtractMetaData(Stream streamData, ProjectContainer projectContainer);
     }

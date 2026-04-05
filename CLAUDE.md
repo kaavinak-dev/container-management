@@ -146,6 +146,13 @@ Migration: `Engines/Migrations/20260314190834_InitialCreate.cs`
 
 ---
 
+## Docker Maintenance
+
+See [DOCKER_MAINTENANCE.md](./DOCKER_MAINTENANCE.md) for C drive space management procedures and cleanup commands.
+When the user asks about Docker disk usage or cleanup, read that file and follow its Claude instructions.
+
+---
+
 ## Known Issues / In-Progress
 
 - `AsyncJobWorkers/Program.cs` has a hardcoded dev path for the sidecar publish dir (`c:\Users\kaavin\...`) — needs to be config-driven

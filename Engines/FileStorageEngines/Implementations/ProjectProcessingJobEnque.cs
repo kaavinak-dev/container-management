@@ -28,10 +28,11 @@ namespace Engines.FileStorageEngines.Implementations
         public static void EnqueJob(IBackgroundJobClient jobClient, ProjectContainer file)
         {
             var projectType = file.getProjectType();
+            //var projectId = file.ExecutableProjectId;
             switch (projectType)
             {
                 case ProjectTypes.JS:
-                    new JSProjectProcessingJobEnque(jobClient).EnqueJob(file);
+                    new JSProjectProcessingJobEnque(jobClient).EnqueJob(file.ProjectId);
                     break;
                 default:
                     throw new Exception("Unrecogonized project type");
@@ -86,10 +87,62 @@ namespace Engines.FileStorageEngines.Implementations
 
         }
 
-        public override async Task DoWork(ProjectContainer programFileContainer)
+        private ProjectContainer ConvertProjectRecordToContainer(ProjectRecord record)
         {
-            var serverUrl = programFileContainer.getProjectStoredServerUrl();
-            var executableProjectId = ((JavaScriptProjectContainer)programFileContainer).ExecutableProjectId;
+            var container = record.ProjectType switch
+            {
+                "js" => new JavaScriptProjectContainer(
+                    record.ProjectName,
+                    record.BucketName,
+                    record.StorageUrl)
+                {
+                    ExecutableProjectId = record.Id
+                },
+                _ => throw new InvalidOperationException($"Unknown project type: {record.ProjectType}")
+            };
+
+            return container;
+        }
+
+        private async Task<ProjectContainer> QuarantineExecutableFile(Stream fileStream, ProjectContainer originalContainer)
+        {
+            // Reset stream — VirusScanAndExtractMetaData consumed it during extraction
+            fileStream.Position = 0;
+
+            // Upload to hazard, keeping the same project name for traceability
+            var hazardObjectName = await storageEngine.UploadProject(
+                fileStream, "hazard", originalContainer.getProjectName());
+
+            // Remove from original bucket — file no longer belongs in "Projects"
+            await storageEngine.DeleteProject(
+                originalContainer.getBucketName(),
+                originalContainer.getProjectArtifactName());
+
+            // Return a new container reflecting the file's final location
+            return new JavaScriptProjectContainer(
+                hazardObjectName,
+                "hazard",
+                originalContainer.getProjectStoredServerUrl());
+        }
+
+        public override async Task DoWork(Guid projectId)
+        {
+            if (metadataStorageEngine == null)
+            {
+                throw new InvalidOperationException("IMetadataStorageEngine not injected — cannot fetch project from database");
+            }
+
+            // Fetch the ProjectRecord from database using projectId
+            var projectRecord = await metadataStorageEngine.GetProjectAsync(projectId);
+            if (projectRecord == null)
+            {
+                throw new InvalidOperationException($"Project with ID {projectId} not found in database");
+            }
+
+            // Convert ProjectRecord → ProjectContainer
+            var programFileContainer = ConvertProjectRecordToContainer(projectRecord);
+
+            var executableProjectId = projectId;
 
             try
             {
@@ -100,6 +153,7 @@ namespace Engines.FileStorageEngines.Implementations
                 }
 
                 // Split server url which is format http://url:port to get port and url info
+                var serverUrl = programFileContainer.getProjectStoredServerUrl();
                 var uri = new Uri(serverUrl);
                 string url = uri.Host;
                 int port = uri.Port;
@@ -139,28 +193,6 @@ namespace Engines.FileStorageEngines.Implementations
                 Console.WriteLine($"Error processing file: {ex.Message}");
                 throw; // Hangfire will retry
             }
-        }
-
-
-        private async Task<ProjectContainer> QuarantineExecutableFile(Stream fileStream, ProjectContainer originalContainer)
-        {
-            // Reset stream — VirusScanAndExtractMetaData consumed it during extraction
-            fileStream.Position = 0;
-
-            // Upload to hazard, keeping the same project name for traceability
-            var hazardObjectName = await storageEngine.UploadProject(
-                fileStream, "hazard", originalContainer.getProjectName());
-
-            // Remove from original bucket — file no longer belongs in "Projects"
-            await storageEngine.DeleteProject(
-                originalContainer.getBucketName(),
-                originalContainer.getProjectArtifactName());
-
-            // Return a new container reflecting the file's final location
-            return new JavaScriptProjectContainer(
-                hazardObjectName,
-                "hazard",
-                originalContainer.getProjectStoredServerUrl());
         }
 
         //the flow is during doWork when the project files are fetched from the storage engine we have to run the below function
@@ -600,9 +632,9 @@ namespace Engines.FileStorageEngines.Implementations
             }
         }
 
-        public override void EnqueJob(ProjectContainer executablFileContainer)
+        public override void EnqueJob(Guid projectId)
         {
-            this.backgroundJobClient.Enqueue(() => this.DoWork(executablFileContainer));
+            this.backgroundJobClient.Enqueue(() => this.DoWork(projectId));
         }
 
         private static async Task<MemoryStream> ToMemoryStreamAsync(Stream source)

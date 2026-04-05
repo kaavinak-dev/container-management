@@ -13,8 +13,6 @@ namespace Engines.FileStorageEngines.Implementations
 {
     public class JavaScriptProjectContainer : ProjectContainer
     {
-        public Guid ExecutableProjectId { get; set; }
-
         public JavaScriptProjectContainer(string projectName, string bucketName, string serverUrl) : base(projectName, bucketName, serverUrl)
         {
 

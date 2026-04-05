@@ -11,6 +11,7 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
     public DbSet<JsMetadataRecord> JsMetadata => Set<JsMetadataRecord>();
     public DbSet<JsDependencyRecord> JsDependencies => Set<JsDependencyRecord>();
     public DbSet<JsVulnerabilityRecord> JsVulnerabilities => Set<JsVulnerabilityRecord>();
+    public DbSet<EditorSessionRecord> EditorSessions => Set<EditorSessionRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -52,5 +53,14 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
             .HasOne(v => v.JsMetadata)
             .WithMany(m => m.Vulnerabilities)
             .HasForeignKey(v => v.JsMetadataId);
+
+        b.Entity<EditorSessionRecord>().ToTable("editor_sessions")
+            .HasKey(e => e.Id);
+        b.Entity<EditorSessionRecord>()
+            .HasIndex(e => e.ProjectId)
+            .IsUnique();
+        b.Entity<EditorSessionRecord>()
+            .Property(e => e.Id)
+            .ValueGeneratedOnAdd();
     }
 }

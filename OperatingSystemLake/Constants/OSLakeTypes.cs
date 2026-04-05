@@ -10,6 +10,7 @@ namespace OperatingSystemLake.Constants
     {
         VirtualBox,
         DockerMachine,
-        Aws
+        Aws,
+        LocalDocker
     }
 }

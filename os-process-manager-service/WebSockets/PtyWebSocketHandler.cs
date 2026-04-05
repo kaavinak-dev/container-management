@@ -18,81 +18,57 @@ public static class PtyWebSocketHandler
 {
     public static async Task HandleAsync(WebSocket webSocket, CancellationToken ct)
     {
-        var ptyOptions = new PtyOptions
-        {
-            Name = "xterm-256color",
-            Rows = 24,
-            Cols = 80,
-            Cwd = Directory.Exists("/project") ? "/project" : "/",
-            App = "/bin/bash",
-            CommandLine = new[] { "/bin/bash" }
-        };
+        var pty = PtyProvider.Spawn(
+            "/bin/bash",
+            80,
+            24,
+            Directory.Exists("/project") ? "/project" : "/",
+            BackendOptions.Default);
 
-        using var pty = await PtyProvider.SpawnAsync(ptyOptions, ct);
-
-        // Linked token so either side closing shuts down both pumps cleanly
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        // Pump 1: PTY stdout → WebSocket  (container output → browser)
-        var ptyToWs = Task.Run(async () =>
+        // PTY stdout → WebSocket via event (no ReaderStream in 0.1.16-pre)
+        pty.PtyData += async (sender, data) =>
         {
-            var buffer = new byte[4096];
-            try
-            {
-                while (!cts.Token.IsCancellationRequested)
-                {
-                    var bytesRead = await pty.ReaderStream.ReadAsync(buffer, cts.Token);
-                    if (bytesRead == 0) break;
+            if (cts.Token.IsCancellationRequested) return;
+            var bytes = Encoding.UTF8.GetBytes(data);
+            await webSocket.SendAsync(
+                new ArraySegment<byte>(bytes),
+                WebSocketMessageType.Binary,
+                endOfMessage: true,
+                cts.Token);
+        };
 
-                    await webSocket.SendAsync(
-                        new ArraySegment<byte>(buffer, 0, bytesRead),
-                        WebSocketMessageType.Binary,
-                        endOfMessage: true,
-                        cts.Token);
+        pty.PtyDisconnected += (sender) => cts.Cancel();
+
+        // WebSocket → PTY stdin
+        var buffer = new byte[4096];
+        try
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                    break;
+
+                if (result.MessageType == WebSocketMessageType.Text)
+                {
+                    var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    var msg = JsonSerializer.Deserialize<ResizeMessage>(json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (msg?.Type == "resize")
+                        pty.Resize(msg.Cols, msg.Rows);
+                }
+                else
+                {
+                    var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    await pty.WriteAsync(text);
                 }
             }
-            catch (OperationCanceledException) { }
-            finally { cts.Cancel(); }
-        }, cts.Token);
-
-        // Pump 2: WebSocket → PTY stdin  (browser keystrokes → container shell)
-        var wsToPty = Task.Run(async () =>
-        {
-            var buffer = new byte[4096];
-            try
-            {
-                while (!cts.Token.IsCancellationRequested)
-                {
-                    var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                        break;
-
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        // Only resize control messages arrive as text frames
-                        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        var msg = JsonSerializer.Deserialize<ResizeMessage>(json,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                        if (msg?.Type == "resize")
-                            pty.Resize(msg.Rows, msg.Cols);
-                    }
-                    else
-                    {
-                        await pty.WriterStream.WriteAsync(buffer.AsMemory(0, result.Count), cts.Token);
-                        await pty.WriterStream.FlushAsync(cts.Token);
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            finally { cts.Cancel(); }
-        }, cts.Token);
-
-        // Wait for whichever side closes first, then tear down both
-        await Task.WhenAny(ptyToWs, wsToPty);
-
-        pty.Kill();
+        }
+        catch (OperationCanceledException) { }
 
         if (webSocket.State == WebSocketState.Open)
         {

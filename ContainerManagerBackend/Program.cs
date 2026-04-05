@@ -1,10 +1,13 @@
 using ContainerManagerBackend.Helpers;
 using ContainerManagerBackend.Services;
+using Engines.FileStorageEngines;
+using Engines.FileStorageEngines.ContainerBuild;
 using OperatingSystemHelpers.Abstractions;
 using OperatingSystemHelpers.Implementations.Windows;
 using OperatingSystemHelpers.Implementations.Linux;
 using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Implementations.Linux;
+using OperatingSystemLake.Implementations.Local;
 using OperatingSystemLake.Implementations.Windows;
 using System.Runtime.InteropServices;
 using OSOrchestrator.Abstractions;
@@ -37,26 +40,15 @@ builder.Services.AddSwaggerGen();
 //builder.Services.AddSingleton<OSOrchestrator.Abstractions.OSOrchestrator>(singletonPreConfigureServicesBuilder.OSOrchestrator);
 builder.Services.AddSingleton<OSLakeConnector>(new VirtualBoxOSLakeConnector(CreatePlatformCommunicator()));
 builder.Services.AddSingleton<OSLakeConnector>(new DockerMachineOSLakeConnector(CreatePlatformCommunicator()));
+builder.Services.AddSingleton<OSLakeConnector>(new LocalDockerOSLakeConnector());
 builder.Services.AddScoped<RequestBodyParser>();
 //builder.Services.AddSingleton<FileStorageManager>();
 builder.Services.AddSingleton<ProjectStorageManager>(serviceProvider =>
 {
     //var config = serviceProvider.GetRequiredService<IConfiguration>();
-    List<Dictionary<string, string>> fileServers = new List<Dictionary<string, string>>()
-    {
-        new Dictionary<string, string>(){
-            {"Url", "192.168.99.101"},
-            {"Port", "9002"},
-            {"AccessKey", "minioadmin"},
-            {"SecretKey","minioadmin"}
-        },
-        new Dictionary<string,string>(){
-            {"Url", "192.168.99.101"},
-            {"Port", "9003"},
-            {"AccessKey","minioadmin"},
-            {"SecretKey","minioadmin"}
-        }
-    };
+    var fileServers = builder.Configuration
+        .GetSection("MinioServers")
+        .Get<List<Dictionary<string, string>>>()!;
     return new ProjectStorageManager(fileServers, isDevEnv: builder.Environment.IsDevelopment());
 
 });
@@ -65,19 +57,23 @@ builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseRedisStorage("192.168.99.101:6379", new RedisStorageOptions
+    .UseRedisStorage(builder.Configuration.GetConnectionString("Redis")!, new RedisStorageOptions
     {
         Prefix = "hangfire:",
         ExpiryCheckInterval = TimeSpan.FromHours(1)
     }));
 builder.Services.AddDbContext<ProjectDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
-        ?? "Host=192.168.99.101;Port=5432;Database=container_management;Username=admin;Password=admin123"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")!));
 builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine>();
+
+// Editor session management
+builder.Services.AddSingleton<IDockerClientFactory, DockerClientFactory>();
+builder.Services.AddScoped<EditorContainerService>();
+builder.Services.AddHostedService<EditorVolumeCleanupService>();
 //builder.Services.AddScoped<ExecutableProcessingJobEnque>();
 
 var redisConnection = ConnectionMultiplexer.Connect(
-    builder.Configuration.GetConnectionString("Redis") ?? "192.168.99.101:6379");
+    builder.Configuration.GetConnectionString("Redis")!);
 builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
 builder.Services.AddSingleton<IDeploymentProgressTracker, RedisDeploymentProgressTracker>();
 
@@ -86,8 +82,8 @@ var app = builder.Build();
 // Approach A: auto-migrate DB on startup — creates all tables fresh on first boot, no-op after
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<IMetadataStorageEngine>();
-    await db.MigrateAsync();
+    var db = scope.ServiceProvider.GetRequiredService<ProjectDbContext>();
+    await db.Database.MigrateAsync();
 }
 
 // Configure the HTTP request pipeline.

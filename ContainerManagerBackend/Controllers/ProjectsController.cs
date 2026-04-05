@@ -114,6 +114,7 @@ public class ProjectsController : ControllerBase
         var epId = await _db.SaveExecutableProjectAsync(ep);
 
         fileContainer.ExecutableProjectId = epId;
+        fileContainer.ProjectId=id;
         ProjectProcessingJobEnqueHelper.EnqueJob(_jobClient, fileContainer);
 
         return Accepted(new { executableProjectId = epId });
