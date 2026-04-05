@@ -155,8 +155,7 @@ public class EditorContainerService
         var hashSuffix = await GetNpmCacheHashAsync(projectId);
 
         var containerName = $"editor-{projectId}";
-        var workspaceVolume = $"workspace-{projectId}";
-        var npmCacheVolume = $"npm-cache-{projectId}-{hashSuffix}";
+        var npmCacheVolume = $"npm-cache-{projectId}-{hashSuffix}"; // workspace-* volume removed; rclone FUSE serves /workspace
 
         var client = GetDockerClient();
 
@@ -176,21 +175,31 @@ public class EditorContainerService
             },
             ExposedPorts = new Dictionary<string, EmptyStruct>
             {
-                { "5002/tcp", default },
                 { "5003/tcp", default },
+                { "9999/tcp", default },
                 { "9229/tcp", default },
             },
             HostConfig = new HostConfig
             {
                 Binds = new List<string>
                 {
-                    $"{workspaceVolume}:/workspace",
-                    $"{npmCacheVolume}:/workspace/node_modules",
+                    $"{npmCacheVolume}:/workspace/node_modules", // workspace-* volume removed; rclone FUSE serves /workspace
                 },
+                Devices = new List<DeviceMapping>
+                {
+                    new DeviceMapping
+                    {
+                        PathOnHost        = "/dev/fuse",
+                        PathInContainer   = "/dev/fuse",
+                        CgroupPermissions = "rwm",
+                    }
+                },
+                CapAdd      = new List<string> { "SYS_ADMIN" },
+                SecurityOpt = new List<string> { "apparmor:unconfined" }, // required on Ubuntu/WSL2 for FUSE mount syscalls
                 PortBindings = new Dictionary<string, IList<PortBinding>>
                 {
-                    { "5002/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "5002" } } },
                     { "5003/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "5003" } } },
+                    { "9999/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "9999" } } },
                     { "9229/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "9229" } } },
                 },
             },
@@ -212,7 +221,7 @@ public class EditorContainerService
             {
                 ProjectId = projectId,
                 ContainerName = containerName,
-                WorkspaceVolume = workspaceVolume,
+                WorkspaceVolume = "fuse-managed", // no Docker volume; rclone FUSE serves /workspace
                 NpmCacheVolume = npmCacheVolume,
                 ContainerIp = containerIp,
                 Status = "Starting",
@@ -314,8 +323,8 @@ public class EditorContainerService
 
         return new EditorSessionStatus(
             ContainerIp: record.ContainerIp,
-            LspPort: 5002,
             FileApiPort: 5003,
+            PtyPort: 9999,
             Status: liveStatus);
     }
 
@@ -334,7 +343,7 @@ public class EditorContainerService
     public async Task DeleteVolumesAsync(string workspaceVolume, string npmCacheVolume)
     {
         var client = GetDockerClient();
-        try { await client.Volumes.RemoveAsync(workspaceVolume); } catch { }
+        // workspaceVolume is "fuse-managed" sentinel — no Docker volume to delete
         try { await client.Volumes.RemoveAsync(npmCacheVolume); } catch { }
     }
 
@@ -354,4 +363,4 @@ public class EditorContainerService
     }
 }
 
-public record EditorSessionStatus(string ContainerIp, int LspPort, int FileApiPort, string Status);
+public record EditorSessionStatus(string ContainerIp, int FileApiPort, int PtyPort, string Status);

@@ -30,8 +30,8 @@ public class EditorSessionsController : ControllerBase
         return Ok(new
         {
             containerIp = status!.ContainerIp,
-            lspPort = status.LspPort,
             fileApiPort = status.FileApiPort,
+            ptyPort = status.PtyPort,
             status = status.Status.ToLowerInvariant(),
         });
     }
@@ -55,8 +55,8 @@ public class EditorSessionsController : ControllerBase
         return Ok(new
         {
             containerIp = status.ContainerIp,
-            lspPort = status.LspPort,
             fileApiPort = status.FileApiPort,
+            ptyPort = status.PtyPort,
             status = status.Status.ToLowerInvariant(),
         });
     }
