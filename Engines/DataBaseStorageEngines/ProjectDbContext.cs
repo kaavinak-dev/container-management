@@ -12,6 +12,7 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
     public DbSet<JsDependencyRecord> JsDependencies => Set<JsDependencyRecord>();
     public DbSet<JsVulnerabilityRecord> JsVulnerabilities => Set<JsVulnerabilityRecord>();
     public DbSet<EditorSessionRecord> EditorSessions => Set<EditorSessionRecord>();
+    public DbSet<AgentRecord> AgentRecords => Set<AgentRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -61,6 +62,15 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
             .IsUnique();
         b.Entity<EditorSessionRecord>()
             .Property(e => e.Id)
+            .ValueGeneratedOnAdd();
+
+        b.Entity<AgentRecord>().ToTable("agent_records")
+            .HasKey(a => a.Id);
+        b.Entity<AgentRecord>()
+            .HasIndex(a => a.AgentId)
+            .IsUnique();
+        b.Entity<AgentRecord>()
+            .Property(a => a.Id)
             .ValueGeneratedOnAdd();
     }
 }

@@ -24,15 +24,19 @@ public class EditorSessionsController : ControllerBase
         var (containerIp, alreadyRunning) = await _editorService.StartEditorContainerAsync(req.ProjectId);
 
         if (!alreadyRunning)
-            await _editorService.PollUntilReadyAsync(req.ProjectId, containerIp);
+        {
+            var starting = await _editorService.GetEditorContainerStatusAsync(req.ProjectId);
+            await _editorService.WaitForContainerRunningAsync(req.ProjectId, starting!.ContainerId!);
+        }
 
         var status = await _editorService.GetEditorContainerStatusAsync(req.ProjectId);
         return Ok(new
         {
             containerIp = status!.ContainerIp,
-            fileApiPort = status.FileApiPort,
             ptyPort = status.PtyPort,
             status = status.Status.ToLowerInvariant(),
+            agentId = status.AgentId,
+            containerId = status.ContainerId,
         });
     }
 
@@ -55,9 +59,10 @@ public class EditorSessionsController : ControllerBase
         return Ok(new
         {
             containerIp = status.ContainerIp,
-            fileApiPort = status.FileApiPort,
             ptyPort = status.PtyPort,
             status = status.Status.ToLowerInvariant(),
+            agentId = status.AgentId,
+            containerId = status.ContainerId,
         });
     }
 

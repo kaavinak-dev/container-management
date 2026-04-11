@@ -96,6 +96,25 @@ services:
     networks:
       - infra
 
+  # ── Relay Agent ────────────────────────────────────────────────────────────
+  relay-agent:
+    build:
+      context: ../container-management-studio/relay-agent
+      dockerfile: Dockerfile
+    container_name: relay-agent
+    command: node --inspect=0.0.0.0:9229 index.js
+    environment:
+      # network_mode: host — relay agent shares the WSL2 VM network namespace.
+      # Both BFF and .NET run on Windows, so host.docker.internal is required for both.
+      - BFF_URL=ws://host.docker.internal:3000/agents
+      - DOTNET_URL=http://host.docker.internal:5235
+      - AGENT_ID=local-relay-agent
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # ensure DNS resolves with network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host  # gives relay agent visibility into all Docker bridge networks
+
 volumes:
   redis-data:
   minio1-data:

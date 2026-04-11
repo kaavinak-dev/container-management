@@ -10,7 +10,6 @@ using Minio.DataModel.Args;
 using OperatingSystemLake.Abstractions;
 using OperatingSystemLake.Constants;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace Engines.FileStorageEngines;
 
@@ -43,6 +42,31 @@ public class EditorContainerService
         var techTypeName = _config["EditorContainer:DockerTechType"] ?? "LocalDocker";
         var techType = Enum.Parse<OSLakeTechTypes>(techTypeName, ignoreCase: true);
         return _dockerFactory.CreateForLake(techType, OSLakeTypes.Linux);
+    }
+
+    private async Task<DockerClient> GetDockerClientForAgentAsync(string agentId)
+    {
+        var agent = await _db.AgentRecords.FirstOrDefaultAsync(a => a.AgentId == agentId);
+        if (agent is null)
+            throw new InvalidOperationException($"No relay agent registered with id '{agentId}'. Ensure the relay agent is running.");
+
+        return new DockerClientConfiguration(new Uri(agent.DockerHost)).CreateClient();
+    }
+
+    //bug: agent id has to be passed in function are param below this has to be fixed
+    // 
+    private async Task<string> ResolveAgentIdAsync()
+    {
+        // Pick the most recently seen agent. In local dev there will only be one ("local-dev").
+        // In production, caller should pass the desired agentId explicitly.
+        var agent = await _db.AgentRecords
+            .OrderByDescending(a => a.LastSeen)
+            .FirstOrDefaultAsync();
+
+        if (agent is null)
+            throw new InvalidOperationException("No relay agents are registered. Ensure the relay agent container is running.");
+
+        return agent.AgentId;
     }
 
     private IMinioClient BuildMinioClient() =>
@@ -80,36 +104,34 @@ public class EditorContainerService
         => "host.docker.internal";
 
     /// <summary>
-    /// Resolves the host to use when the .NET backend makes HTTP calls to a running
-    /// editor container (e.g. polling /health, future direct file API calls).
-    ///
-    /// CURRENT BEHAVIOUR (dev / Docker Desktop on Windows):
-    ///   Returns "localhost" — the container's ports (5002, 5003) are forwarded to the
-    ///   host machine's localhost, so the .NET backend reaches them via localhost:{port}.
-    ///   Docker Desktop on Windows runs containers inside a WSL2 VM, meaning the
-    ///   container's internal bridge IP (e.g. 172.17.0.x) is NOT directly reachable
-    ///   from a process running on the Windows host. Port-forwarding to localhost is the
-    ///   only reliable path from host → container on Docker Desktop.
-    ///
-    /// WHY THIS IS A TEMPORARY ASSUMPTION:
-    ///   This assumes the .NET backend and the editor containers share the same Docker
-    ///   host with port-forwarding in place. In a production topology where editor
-    ///   containers run on a separate compute fleet, this approach does not scale —
-    ///   port conflicts arise with multiple containers and localhost is meaningless
-    ///   across machines.
-    ///
-    ///   The intended future architecture is a dedicated container-proxy / sidecar
-    ///   service that maintains a registry of running editor containers and their
-    ///   reachable endpoints, acting as the intermediary between the .NET backend and
-    ///   the containers. At that point this method should return the proxy's address
-    ///   for the given container, and the containerIp parameter (internal bridge IP)
-    ///   becomes the proxy's routing key rather than a directly-dialed address.
-    ///
-    /// DO NOT replace "localhost" with containerIp directly on Docker Desktop —
-    /// the internal bridge IP is unreachable from the Windows host process.
+    /// Ensures a project-specific Docker bridge network exists for the editor container.
+    /// Each project gets its own isolated network (editor-net-{projectId}).
+    /// The relay agent (network_mode: host) can reach any bridge network, so it will
+    /// reach this container regardless of which project network it is on.
     /// </summary>
-    private string ResolveContainerHost(string containerIp)
-        => "localhost";
+    private async Task<string> EnsureProjectNetworkAsync(DockerClient client, string projectId)
+    {
+        var networkName = $"editor-net-{projectId}";
+        var networks = await client.Networks.ListNetworksAsync(new NetworksListParameters
+        {
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+            {
+                ["name"] = new Dictionary<string, bool> { [networkName] = true }
+            }
+        });
+
+        if (!networks.Any(n => n.Name == networkName))
+        {
+            await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
+            {
+                Name = networkName,
+                Driver = "bridge",
+            });
+            Console.WriteLine($"[editor] Created Docker network {networkName}");
+        }
+
+        return networkName;
+    }
 
     /// <summary>
     /// Returns first 8 chars of SHA256 hash of package-lock.json (preferred) or package.json (fallback).
@@ -157,13 +179,20 @@ public class EditorContainerService
         var containerName = $"editor-{projectId}";
         var npmCacheVolume = $"npm-cache-{projectId}-{hashSuffix}"; // workspace-* volume removed; rclone FUSE serves /workspace
 
-        var client = GetDockerClient();
+        var agentId = await ResolveAgentIdAsync();
+        var client = await GetDockerClientForAgentAsync(agentId);
+
+        var networkName = await EnsureProjectNetworkAsync(client, projectId);
 
         // Docker auto-creates named volumes when specified in Binds
         var createParams = new CreateContainerParameters
         {
             Image = "editor-base:latest",
             Name = containerName,
+            Labels = new Dictionary<string, string>
+            {
+                { "com.manager.projectid", projectId }
+            },
             Env = new List<string>
             {
                 $"MINIO_ENDPOINT={ResolveMinioEndpointForContainer()}",
@@ -175,7 +204,6 @@ public class EditorContainerService
             },
             ExposedPorts = new Dictionary<string, EmptyStruct>
             {
-                { "5003/tcp", default },
                 { "9999/tcp", default },
                 { "9229/tcp", default },
             },
@@ -196,12 +224,18 @@ public class EditorContainerService
                 },
                 CapAdd      = new List<string> { "SYS_ADMIN" },
                 SecurityOpt = new List<string> { "apparmor:unconfined" }, // required on Ubuntu/WSL2 for FUSE mount syscalls
-                PortBindings = new Dictionary<string, IList<PortBinding>>
+                // No port bindings — PTY is routed through the relay agent tunnel,
+                // and the file API has been replaced by the FUSE/MinIO virtual filesystem.
+            },
+            // Attach to the project-specific network so containers are isolated per project.
+            // The relay agent (network_mode: host) can reach any bridge network, so it will
+            // reach this container regardless of which project network it is on.
+            NetworkingConfig = new NetworkingConfig
+            {
+                EndpointsConfig = new Dictionary<string, EndpointSettings>
                 {
-                    { "5003/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "5003" } } },
-                    { "9999/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "9999" } } },
-                    { "9229/tcp", new List<PortBinding> { new() { HostIP = "127.0.0.1", HostPort = "9229" } } },
-                },
+                    [networkName] = new EndpointSettings()
+                }
             },
         };
 
@@ -213,7 +247,7 @@ public class EditorContainerService
             throw new InvalidOperationException($"Container {containerName} failed to start.");
 
         var inspect = await client.Containers.InspectContainerAsync(containerId);
-        var containerIp = inspect.NetworkSettings.Networks["bridge"].IPAddress;
+        var containerIp = inspect.NetworkSettings.Networks[networkName].IPAddress;
 
         if (existing is null)
         {
@@ -224,6 +258,8 @@ public class EditorContainerService
                 WorkspaceVolume = "fuse-managed", // no Docker volume; rclone FUSE serves /workspace
                 NpmCacheVolume = npmCacheVolume,
                 ContainerIp = containerIp,
+                AgentId = agentId,
+                ContainerId = containerId,
                 Status = "Starting",
                 LastActive = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
@@ -232,6 +268,8 @@ public class EditorContainerService
         else
         {
             existing.ContainerIp = containerIp;
+            existing.AgentId = agentId;
+            existing.ContainerId = containerId;
             existing.NpmCacheVolume = npmCacheVolume;
             existing.Status = "Starting";
             existing.LastActive = DateTime.UtcNow;
@@ -241,22 +279,27 @@ public class EditorContainerService
         return (containerIp, alreadyRunning: false);
     }
 
-    // ── PollUntilReadyAsync ───────────────────────────────────────────────────
+    // ── WaitForContainerRunningAsync ──────────────────────────────────────────
 
-    public async Task PollUntilReadyAsync(string projectId, string containerIp)
+    public async Task WaitForContainerRunningAsync(string projectId, string containerId)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        var record = await _db.EditorSessions.FirstOrDefaultAsync(e => e.ProjectId == projectId);
+        if (record?.AgentId is null)
+            throw new InvalidOperationException($"No agent found for project {projectId}");
+
+        var client = await GetDockerClientForAgentAsync(record.AgentId);
         var deadline = DateTime.UtcNow.AddMinutes(3);
 
         while (DateTime.UtcNow < deadline)
         {
             try
             {
-                var response = await http.GetStringAsync($"http://{ResolveContainerHost(containerIp)}:5003/health");
-                using var doc = JsonDocument.Parse(response);
-                if (doc.RootElement.TryGetProperty("lspRunning", out var lspProp) && lspProp.GetBoolean())
+                var inspect = await client.Containers.InspectContainerAsync(containerId);
+                if (inspect.State.Running)
                 {
-                    var record = await _db.EditorSessions.FirstOrDefaultAsync(e => e.ProjectId == projectId);
+                    // Give the FUSE mount and sidecar a moment to initialise
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+
                     if (record is not null)
                     {
                         record.Status = "Ready";
@@ -268,7 +311,7 @@ public class EditorContainerService
             }
             catch (Exception)
             {
-                // Container not ready yet — keep polling
+                // Container not yet inspectable — keep polling
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2));
@@ -282,19 +325,26 @@ public class EditorContainerService
 
     public async Task StopEditorContainerAsync(string projectId)
     {
-        var client = GetDockerClient();
+        var record = await _db.EditorSessions.FirstOrDefaultAsync(e => e.ProjectId == projectId);
+
         try
         {
+            var agentId = record?.AgentId ?? await ResolveAgentIdAsync();
+            var client = await GetDockerClientForAgentAsync(agentId);
+
             await client.Containers.StopContainerAsync(
                 $"editor-{projectId}",
                 new ContainerStopParameters { WaitBeforeKillSeconds = 5 });
+            try { await client.Networks.DeleteNetworkAsync($"editor-net-{projectId}"); } catch { }
         }
         catch (DockerContainerNotFoundException)
         {
             // Container already gone — still update DB below
         }
 
-        var record = await _db.EditorSessions.FirstOrDefaultAsync(e => e.ProjectId == projectId);
+        // Remove the project-specific network now that the container is stopped
+        
+
         if (record is not null)
         {
             record.Status = "Stopped";
@@ -312,7 +362,9 @@ public class EditorContainerService
         var liveStatus = record.Status;
         try
         {
-            var client = GetDockerClient();
+            var agentId = record.AgentId ?? await ResolveAgentIdAsync();
+            var client = await GetDockerClientForAgentAsync(agentId);
+
             var inspect = await client.Containers.InspectContainerAsync($"editor-{projectId}");
             liveStatus = inspect.State.Running ? record.Status : "Stopped";
         }
@@ -323,9 +375,10 @@ public class EditorContainerService
 
         return new EditorSessionStatus(
             ContainerIp: record.ContainerIp,
-            FileApiPort: 5003,
             PtyPort: 9999,
-            Status: liveStatus);
+            Status: liveStatus,
+            AgentId: record.AgentId,
+            ContainerId: record.ContainerId);
     }
 
     // ── UpdateLastActiveAsync ─────────────────────────────────────────────────
@@ -342,14 +395,16 @@ public class EditorContainerService
 
     public async Task DeleteVolumesAsync(string workspaceVolume, string npmCacheVolume)
     {
-        var client = GetDockerClient();
+        var agentId = await ResolveAgentIdAsync();
+        var client = await GetDockerClientForAgentAsync(agentId);
         // workspaceVolume is "fuse-managed" sentinel — no Docker volume to delete
         try { await client.Volumes.RemoveAsync(npmCacheVolume); } catch { }
     }
 
     public async Task DeleteOrphanedNpmCacheVolumesAsync(string projectId, string currentNpmCacheVolume)
     {
-        var client = GetDockerClient();
+        var agentId = await ResolveAgentIdAsync();
+        var client = await GetDockerClientForAgentAsync(agentId);
         var allVolumes = await client.Volumes.ListAsync(new VolumesListParameters());
         var prefix = $"npm-cache-{projectId}-";
         var orphans = allVolumes.Volumes
@@ -363,4 +418,10 @@ public class EditorContainerService
     }
 }
 
-public record EditorSessionStatus(string ContainerIp, int FileApiPort, int PtyPort, string Status);
+public record EditorSessionStatus(
+    string ContainerIp,
+    int PtyPort,
+    string Status,
+    string? AgentId = null,
+    string? ContainerId = null
+);

@@ -24,7 +24,7 @@ public class DockerClientFactory : IDockerClientFactory
         if (techType == OSLakeTechTypes.LocalDocker)
         {
             var uri = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? new Uri("npipe://./pipe/docker_engine")
+                ? new Uri("npipe://./pipe/dockerDesktopLinuxEngine")
                 : new Uri("unix:///var/run/docker.sock");
             return new DockerClientConfiguration(uri).CreateClient();
         }
