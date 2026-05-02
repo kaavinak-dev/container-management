@@ -2,6 +2,7 @@ using ContainerManagerBackend.Helpers;
 using ContainerManagerBackend.Services;
 using Engines.FileStorageEngines;
 using Engines.FileStorageEngines.ContainerBuild;
+using Engines.FileStorageEngines.Resources;
 using OperatingSystemHelpers.Abstractions;
 using OperatingSystemHelpers.Implementations.Windows;
 using OperatingSystemHelpers.Implementations.Linux;
@@ -68,8 +69,12 @@ builder.Services.AddScoped<IMetadataStorageEngine, PostgresMetadataStorageEngine
 
 // Editor session management
 builder.Services.AddSingleton<IDockerClientFactory, DockerClientFactory>();
+builder.Services.AddScoped<ProjectFabricService>();
+builder.Services.AddScoped<ResourceProvisionerService>();
+builder.Services.AddScoped<SdkInjectionService>();
 builder.Services.AddScoped<EditorContainerService>();
 builder.Services.AddHostedService<EditorVolumeCleanupService>();
+builder.Services.AddHostedService<FabricCleanupService>();
 //builder.Services.AddScoped<ExecutableProcessingJobEnque>();
 
 var redisConnection = ConnectionMultiplexer.Connect(

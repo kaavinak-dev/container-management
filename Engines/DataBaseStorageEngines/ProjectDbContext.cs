@@ -13,6 +13,8 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
     public DbSet<JsVulnerabilityRecord> JsVulnerabilities => Set<JsVulnerabilityRecord>();
     public DbSet<EditorSessionRecord> EditorSessions => Set<EditorSessionRecord>();
     public DbSet<AgentRecord> AgentRecords => Set<AgentRecord>();
+    public DbSet<ProjectNetworkRecord> ProjectNetworks => Set<ProjectNetworkRecord>();
+    public DbSet<ProjectResourceRecord> ProjectResources => Set<ProjectResourceRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -63,6 +65,11 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
         b.Entity<EditorSessionRecord>()
             .Property(e => e.Id)
             .ValueGeneratedOnAdd();
+        b.Entity<EditorSessionRecord>()
+            .HasOne(e => e.NetworkRecord)
+            .WithMany(n => n.EditorSessions)
+            .HasForeignKey(e => e.NetworkRecordId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         b.Entity<AgentRecord>().ToTable("agent_records")
             .HasKey(a => a.Id);
@@ -72,5 +79,28 @@ public class ProjectDbContext(DbContextOptions<ProjectDbContext> options) : DbCo
         b.Entity<AgentRecord>()
             .Property(a => a.Id)
             .ValueGeneratedOnAdd();
+
+        // ── Project Fabric (PRS) ──────────────────────────────────
+        b.Entity<ProjectNetworkRecord>().ToTable("project_networks")
+            .HasKey(n => n.Id);
+        b.Entity<ProjectNetworkRecord>()
+            .HasIndex(n => n.ProjectId)
+            .IsUnique();
+        b.Entity<ProjectNetworkRecord>()
+            .Property(n => n.Id)
+            .ValueGeneratedOnAdd();
+
+        b.Entity<ProjectResourceRecord>().ToTable("project_resources")
+            .HasKey(r => r.Id);
+        b.Entity<ProjectResourceRecord>()
+            .HasIndex(r => r.ProjectId);
+        b.Entity<ProjectResourceRecord>()
+            .Property(r => r.Id)
+            .ValueGeneratedOnAdd();
+        b.Entity<ProjectResourceRecord>()
+            .HasOne(r => r.NetworkRecord)
+            .WithMany(n => n.Resources)
+            .HasForeignKey(r => r.NetworkRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

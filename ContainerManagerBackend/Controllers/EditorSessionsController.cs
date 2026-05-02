@@ -8,9 +8,15 @@ namespace ContainerManagerBackend.Controllers;
 public class EditorSessionsController : ControllerBase
 {
     private readonly EditorContainerService _editorService;
+    private readonly ProjectFabricService _fabricService;
 
-    public EditorSessionsController(EditorContainerService editorService)
-        => _editorService = editorService;
+    public EditorSessionsController(
+        EditorContainerService editorService,
+        ProjectFabricService fabricService)
+    {
+        _editorService = editorService;
+        _fabricService = fabricService;
+    }
 
     // POST /api/editor-sessions
     // Body: { "projectId": "abc123" }
@@ -68,10 +74,12 @@ public class EditorSessionsController : ControllerBase
 
     // PUT /api/editor-sessions/{projectId}/activity
     // Called by the BFF as a heartbeat to keep the session alive.
+    // Also updates the fabric network's LastActivity to prevent idle teardown.
     [HttpPut("{projectId}/activity")]
     public async Task<IActionResult> Heartbeat(string projectId)
     {
         await _editorService.UpdateLastActiveAsync(projectId);
+        await _fabricService.UpdateFabricActivityAsync(projectId);
         return Ok();
     }
 }

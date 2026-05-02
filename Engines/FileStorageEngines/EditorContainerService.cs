@@ -3,6 +3,7 @@ using Docker.DotNet.Models;
 using Engines.DataBaseStorageEngines;
 using Engines.DataBaseStorageEngines.Entities;
 using Engines.FileStorageEngines.ContainerBuild;
+using Engines.FileStorageEngines.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Minio;
@@ -18,6 +19,7 @@ public class EditorContainerService
     private readonly IDockerClientFactory _dockerFactory;
     private readonly ProjectDbContext _db;
     private readonly IConfiguration _config;
+    private readonly ProjectFabricService _fabricService;
 
     private string MinioEndpoint => _config["EditorContainer:MinioEndpoint"]!;
     private int MinioPort => _config.GetValue<int>("EditorContainer:MinioPort");
@@ -28,11 +30,13 @@ public class EditorContainerService
     public EditorContainerService(
         IDockerClientFactory dockerFactory,
         ProjectDbContext db,
-        IConfiguration config)
+        IConfiguration config,
+        ProjectFabricService fabricService)
     {
         _dockerFactory = dockerFactory;
         _db = db;
         _config = config;
+        _fabricService = fabricService;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -104,33 +108,34 @@ public class EditorContainerService
         => "host.docker.internal";
 
     /// <summary>
-    /// Ensures a project-specific Docker bridge network exists for the editor container.
-    /// Each project gets its own isolated network (editor-net-{projectId}).
-    /// The relay agent (network_mode: host) can reach any bridge network, so it will
-    /// reach this container regardless of which project network it is on.
+    /// Builds a list of environment variables for all active resources in this project's fabric.
+    /// e.g., DB_HOST=db, DB_PORT=3306, REDIS_HOST=cache, REDIS_PORT=6379
     /// </summary>
-    private async Task<string> EnsureProjectNetworkAsync(DockerClient client, string projectId)
+    private async Task<List<string>> BuildResourceEnvVarsAsync(string projectId)
     {
-        var networkName = $"editor-net-{projectId}";
-        var networks = await client.Networks.ListNetworksAsync(new NetworksListParameters
-        {
-            Filters = new Dictionary<string, IDictionary<string, bool>>
-            {
-                ["name"] = new Dictionary<string, bool> { [networkName] = true }
-            }
-        });
+        var envVars = new List<string>();
 
-        if (!networks.Any(n => n.Name == networkName))
+        var activeResources = await _db.ProjectResources
+            .Where(r => r.ProjectId == projectId && r.Status != "Stopped")
+            .ToListAsync();
+
+        foreach (var resource in activeResources)
         {
-            await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
+            if (!Enum.TryParse<ResourceType>(resource.ResourceType, out var resType))
+                continue;
+
+            var definition = ResourceCatalog.GetDefinition(resType);
+            envVars.Add($"{definition.EnvVarPrefix}_HOST={definition.DefaultAlias}");
+            envVars.Add($"{definition.EnvVarPrefix}_PORT={definition.DefaultPort}");
+
+            // Forward container-level secrets as env vars the user's app can read
+            foreach (var kv in definition.ContainerEnvVars)
             {
-                Name = networkName,
-                Driver = "bridge",
-            });
-            Console.WriteLine($"[editor] Created Docker network {networkName}");
+                envVars.Add($"{definition.EnvVarPrefix}_{kv.Key}={kv.Value}");
+            }
         }
 
-        return networkName;
+        return envVars;
     }
 
     /// <summary>
@@ -182,9 +187,25 @@ public class EditorContainerService
         var agentId = await ResolveAgentIdAsync();
         var client = await GetDockerClientForAgentAsync(agentId);
 
-        var networkName = await EnsureProjectNetworkAsync(client, projectId);
+        // Use the Project Fabric Service to ensure the per-project network exists
+        var networkRecord = await _fabricService.EnsureNetworkAsync(projectId, agentId);
+        var networkName = networkRecord.NetworkName;
+
+        // Build env vars for any active resources on this project's fabric
+        var resourceEnvVars = await BuildResourceEnvVarsAsync(projectId);
 
         // Docker auto-creates named volumes when specified in Binds
+        var envList = new List<string>
+        {
+            $"MINIO_ENDPOINT={ResolveMinioEndpointForContainer()}",
+            $"MINIO_PORT={MinioPort}",
+            $"MINIO_ACCESS_KEY={MinioAccessKey}",
+            $"MINIO_SECRET_KEY={MinioSecretKey}",
+            $"MINIO_BUCKET={MinioBucket}",
+            $"PROJECT_ID={projectId}",
+        };
+        envList.AddRange(resourceEnvVars);
+
         var createParams = new CreateContainerParameters
         {
             Image = "editor-base:latest",
@@ -193,15 +214,7 @@ public class EditorContainerService
             {
                 { "com.manager.projectid", projectId }
             },
-            Env = new List<string>
-            {
-                $"MINIO_ENDPOINT={ResolveMinioEndpointForContainer()}",
-                $"MINIO_PORT={MinioPort}",
-                $"MINIO_ACCESS_KEY={MinioAccessKey}",
-                $"MINIO_SECRET_KEY={MinioSecretKey}",
-                $"MINIO_BUCKET={MinioBucket}",
-                $"PROJECT_ID={projectId}",
-            },
+            Env = envList,
             ExposedPorts = new Dictionary<string, EmptyStruct>
             {
                 { "9999/tcp", default },
@@ -227,14 +240,17 @@ public class EditorContainerService
                 // No port bindings — PTY is routed through the relay agent tunnel,
                 // and the file API has been replaced by the FUSE/MinIO virtual filesystem.
             },
-            // Attach to the project-specific network so containers are isolated per project.
-            // The relay agent (network_mode: host) can reach any bridge network, so it will
-            // reach this container regardless of which project network it is on.
+            // Attach to the project fabric network with alias "editor" so resource containers
+            // can reach the editor by hostname. The relay agent (network_mode: host) can reach
+            // any bridge network, so it will reach this container regardless.
             NetworkingConfig = new NetworkingConfig
             {
                 EndpointsConfig = new Dictionary<string, EndpointSettings>
                 {
-                    [networkName] = new EndpointSettings()
+                    [networkName] = new EndpointSettings
+                    {
+                        Aliases = new List<string> { "editor" },
+                    }
                 }
             },
         };
@@ -260,6 +276,7 @@ public class EditorContainerService
                 ContainerIp = containerIp,
                 AgentId = agentId,
                 ContainerId = containerId,
+                NetworkRecordId = networkRecord.Id,
                 Status = "Starting",
                 LastActive = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
@@ -271,6 +288,7 @@ public class EditorContainerService
             existing.AgentId = agentId;
             existing.ContainerId = containerId;
             existing.NpmCacheVolume = npmCacheVolume;
+            existing.NetworkRecordId = networkRecord.Id;
             existing.Status = "Starting";
             existing.LastActive = DateTime.UtcNow;
         }
@@ -335,15 +353,14 @@ public class EditorContainerService
             await client.Containers.StopContainerAsync(
                 $"editor-{projectId}",
                 new ContainerStopParameters { WaitBeforeKillSeconds = 5 });
-            try { await client.Networks.DeleteNetworkAsync($"editor-net-{projectId}"); } catch { }
+
+            // Do NOT tear down the fabric network here — other resource containers may
+            // still be running on it. FabricCleanupService handles full teardown when idle.
         }
         catch (DockerContainerNotFoundException)
         {
             // Container already gone — still update DB below
         }
-
-        // Remove the project-specific network now that the container is stopped
-        
 
         if (record is not null)
         {

@@ -39,12 +39,16 @@ public class EditorVolumeCleanupService : IHostedService, IDisposable
             var db = scope.ServiceProvider.GetRequiredService<ProjectDbContext>();
             var editorService = scope.ServiceProvider.GetRequiredService<EditorContainerService>();
 
-            // Stop and delete volumes for sessions idle for more than 2 hours
+            // Stop and delete volumes for sessions idle for more than 2 hours.
+            // Skip sessions that have a NetworkRecordId — those belong to a project fabric
+            // and are managed by FabricCleanupService (shorter idle threshold, tears down
+            // resources + network together).
             var staleThreshold = DateTime.UtcNow.AddHours(-2);
             var staleRecords = await db.EditorSessions
                 .Where(e => e.LastActive < staleThreshold
                          && e.Status != "Stopped"
-                         && e.Status != "Cleaned")
+                         && e.Status != "Cleaned"
+                         && e.NetworkRecordId == null)
                 .ToListAsync();
 
             foreach (var record in staleRecords)

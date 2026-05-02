@@ -125,6 +125,7 @@ namespace Engines.FileStorageEngines.Implementations
                 originalContainer.getProjectStoredServerUrl());
         }
 
+        [AutomaticRetry(Attempts = 0)]
         public override async Task DoWork(Guid projectId)
         {
             if (metadataStorageEngine == null)

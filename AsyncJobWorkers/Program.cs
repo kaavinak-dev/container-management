@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Engines.DeploymentTracking;
 using Engines.FileStorageEngines.ContainerBuild;
 using Engines.FileStorageEngines.Implementations;
+using Engines.FileStorageEngines.Resources;
 using Engines.DataBaseStorageEngines;
 using Engines.DataBaseStorageEngines.Abstractions;
 using Engines.DataBaseStorageEngines.Implementations;
@@ -83,6 +84,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
 builder.Services.AddSingleton<IDeploymentProgressTracker, RedisDeploymentProgressTracker>();
 
 builder.Services.AddScoped<JSProjectProcessingJobEnque>();
+builder.Services.AddScoped<SdkInjectionService>();
+builder.Services.AddScoped<ResourceProvisioningJob>();
 
 
 var host = builder.Build();

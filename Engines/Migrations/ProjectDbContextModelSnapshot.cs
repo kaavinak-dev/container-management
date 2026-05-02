@@ -303,6 +303,36 @@ namespace Engines.Migrations
                     b.Navigation("ExecutableProjects");
                 });
 
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.AgentRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy",
+                            NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
+                    b.Property<string>("AgentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DockerHost")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Hostname")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LastSeen")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentId")
+                        .IsUnique();
+
+                    b.ToTable("agent_records", (string)null);
+                });
+
             modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.EditorSessionRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -331,6 +361,15 @@ namespace Engines.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("AgentId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerId")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("NetworkRecordId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -346,7 +385,140 @@ namespace Engines.Migrations
                     b.HasIndex("ProjectId")
                         .IsUnique();
 
+                    b.HasIndex("NetworkRecordId");
+
                     b.ToTable("editor_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ProjectNetworkRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy",
+                            NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NetworkDockerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NetworkName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AgentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastActivity")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.ToTable("project_networks", (string)null);
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ProjectResourceRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy",
+                            NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("NetworkRecordId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerDockerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageTag")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AgentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EnvironmentJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastHealthCheck")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("NetworkRecordId");
+
+                    b.ToTable("project_resources", (string)null);
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.EditorSessionRecord", b =>
+                {
+                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ProjectNetworkRecord", "NetworkRecord")
+                        .WithMany("EditorSessions")
+                        .HasForeignKey("NetworkRecordId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("NetworkRecord");
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ProjectResourceRecord", b =>
+                {
+                    b.HasOne("Engines.DataBaseStorageEngines.Entities.ProjectNetworkRecord", "NetworkRecord")
+                        .WithMany("Resources")
+                        .HasForeignKey("NetworkRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NetworkRecord");
+                });
+
+            modelBuilder.Entity("Engines.DataBaseStorageEngines.Entities.ProjectNetworkRecord", b =>
+                {
+                    b.Navigation("Resources");
+
+                    b.Navigation("EditorSessions");
                 });
 
 #pragma warning restore 612, 618
